@@ -34,11 +34,24 @@ def download_data(stocks, start, end):
     
     for stock in stocks:
         ticker = yf.Ticker(stock)
-        data = ticker.history(start=start, end=end)
-        if not data.empty:
-            all_data[stock] = data['Close']
+        try:
+            # Download data in smaller chunks to avoid timeout issues
+            chunk_start = start
+            stock_data = []
+            while chunk_start < end:
+                chunk_end = min(chunk_start + timedelta(days=365), end)
+                chunk = ticker.history(start=chunk_start, end=chunk_end, interval="1d")
+                if not chunk.empty:
+                    stock_data.append(chunk['Close'])
+                chunk_start = chunk_end + timedelta(days=1)
+                time.sleep(1)  # Add a small delay to avoid rate limiting
+            
+            if stock_data:
+                all_data[stock] = pd.concat(stock_data)
+            else:
+                print(f"No data available for {stock}")
+        except Exception as e:
+            print(f"Error downloading data for {stock}: {e}")
     
-    stockData = pd.DataFrame(all_data)    
-
-
+    stockData = pd.DataFrame(all_data)
     return stockData
