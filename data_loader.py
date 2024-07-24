@@ -1,5 +1,9 @@
-
 import yfinance as yf
+from pathlib import Path
+import appdirs as ad
+import pandas as pd
+
+CACHE_DIR = ".cache"
 
 def download_data(stocks, start, end):
     """
@@ -20,6 +24,12 @@ def download_data(stocks, start, end):
         Dataframe containing the closing price of the stock data.
 
     """
+    # Force appdirs to say that the cache dir is .cache
+    ad.user_cache_dir = lambda *args: CACHE_DIR
+
+    # Create the cache dir if it doesn't exist
+    Path(CACHE_DIR).mkdir(exist_ok=True)
+
     all_data = {}
     
     for stock in stocks:
@@ -28,6 +38,7 @@ def download_data(stocks, start, end):
         if not data.empty:
             all_data[stock] = data['Close']
     
-    stockData = pd.DataFrame(all_data)
-    
+    stockData = pd.DataFrame(all_data)    
+
+
     return stockData
