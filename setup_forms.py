@@ -143,6 +143,8 @@ def setup_optimise_portfolio_form(form):
         Optimise portfolio form.
 
     """
+    if not state.universe or len(state.universe.stocks) < 2:
+        return form
     
     options_map = {"Maximise Returns": "max_returns", "Minimise Volatility": "min_vol"}
     
