@@ -50,55 +50,16 @@ setup_efficient_frontier_display(efficient_frontier_display)
 
 st.write(f"yfinance version: {yf.__version__}")
 
-def download_data(stocks, start, end):
-    """
-    Download stock data from Yahoo Finance using Ticker objects.
-    """
-    all_data = {}
-    
-    # Convert start and end to datetime objects if they're strings
-    start = pd.to_datetime(start)
-    end = pd.to_datetime(end)
-    
-    st.write(f"Attempting to download data for {len(stocks)} stocks from {start} to {end}")
-    
-    # Disable yfinance cache
-    yf.set_tz_cache_location(None)
-    
-    progress_bar = st.progress(0)
-    for i, stock in enumerate(stocks):
-        st.write(f"Processing stock: {stock}")
-        try:
-            # Use yf.download instead of Ticker.history
-            data = yf.download(stock, start=start, end=end, progress=False)
-            st.write(f"Downloaded data shape for {stock}: {data.shape}")
-            if not data.empty:
-                all_data[stock] = data['Close']
-                st.write(f"Successfully added data for {stock}")
-            else:
-                st.warning(f"No data available for {stock}")
-        except Exception as e:
-            st.error(f"Error downloading data for {stock}: {str(e)}")
-        
-        progress_bar.progress((i + 1) / len(stocks))
-        time.sleep(1)  # Add a small delay to avoid rate limiting
-    
-    st.write(f"Download process completed. Total stocks with data: {len(all_data)}")
-    
-    stockData = pd.DataFrame(all_data)
-    st.write(f"Final DataFrame shape: {stockData.shape}")
-    return stockData
-
-def download_single_day(stock, date):
+def get_stock_info(stock):
     try:
-        data = yf.download(stock, start=date, end=date + pd.Timedelta(days=1), progress=False)
-        st.write(f"Downloaded data shape for {stock} on {date}: {data.shape}")
-        return data
+        ticker = yf.Ticker(stock)
+        info = ticker.info
+        st.write(f"Retrieved info for {stock}")
+        return info
     except Exception as e:
-        st.error(f"Error downloading data for {stock}: {str(e)}")
-        return pd.DataFrame()
+        st.error(f"Error retrieving info for {stock}: {str(e)}")
+        return {}
 
 stock = 'AAPL'
-date = pd.Timestamp('2023-12-29')  # Last trading day of 2023
-data = download_single_day(stock, date)
-st.write(data)
+info = get_stock_info(stock)
+st.write(info)
