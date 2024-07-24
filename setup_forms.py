@@ -80,6 +80,9 @@ def setup_weights_form(form):
         Weights selection form.
 
     """
+    if not state.portfolios or not state.portfolios['custom']:
+        form.write("No portfolio has been detected.")
+        return form
     
     form.write("Change the relative weights of your portfolio.")
     weights = ask_for_weights(form, state.portfolios['custom'].weights)
