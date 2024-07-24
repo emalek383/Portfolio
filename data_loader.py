@@ -3,7 +3,7 @@ from pathlib import Path
 import appdirs as ad
 import pandas as pd
 
-CACHE_DIR = ".cache"
+#CACHE_DIR = ".cache"
 
 def download_data(stocks, start, end):
     """
