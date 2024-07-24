@@ -11,7 +11,7 @@ import datetime as dt
 from dateutil.relativedelta import relativedelta
 from helper_functions import get_mean_returns
 from optimisers import maximise_SR, minimise_vol, efficient_portfolio, maximise_returns
-from data_loader import get_data
+from data_loader import download_data
 
 TRADING_DAYS = 252
 
@@ -196,19 +196,22 @@ class stock_universe():
 
         """
         
-        stock_data = get_data(self.stocks, self.start_date, self.end_date)
+        stock_data = download_data(self.stocks, self.start_date, self.end_date)
         ignored = []
         
-        for ticker in self.stocks:
-            if ticker not in stock_data.columns or stock_data[ticker].isnull().all():
-                ignored.append(ticker)
-                self.stocks.remove(ticker)
+        if not self.stocks or not stock_data:
+            ignored = self.stocks
+        else:
+            for ticker in self.stocks:
+                if ticker not in stock_data.columns or stock_data[ticker].isnull().all():
+                    ignored.append(ticker)
+                    self.stocks.remove(ticker)
 
-        stock_data = stock_data[self.stocks]
+            stock_data = stock_data[self.stocks]
                 
         self.stock_data = stock_data
         
-        self.bonds_data = get_data(['^IRX'], self.start_date, self.end_date)
+        self.bonds_data = download_data(['^IRX'], self.start_date, self.end_date)
         
         return ignored
         
