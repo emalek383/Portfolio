@@ -50,21 +50,47 @@ setup_optimise_portfolio_form(optimise_portfolio_form)
 setup_portfolio_display(portfolio_display)
 setup_efficient_frontier_display(efficient_frontier_display)
 
-st.write(f"yfinance version: {yf.__version__}")
+ALPHA_VANTAGE_API_KEY = 'OEK1PF1WTFP6O05M'
 
-def get_stock_data_pdr(symbol, start_date, end_date):
+def get_stock_data_alpha_vantage(symbol, start_date, end_date):
+    base_url = 'https://www.alphavantage.co/query'
+    function = 'TIME_SERIES_DAILY'
+    
+    params = {
+        'function': function,
+        'symbol': symbol,
+        'apikey': ALPHA_VANTAGE_API_KEY,
+        'outputsize': 'full'
+    }
+    
     try:
-        data = pdr.get_data_yahoo(symbol, start=start_date, end=end_date)
-        st.write(f"Retrieved data for {symbol}. Shape: {data.shape}")
-        return data
+        response = requests.get(base_url, params=params)
+        data = response.json()
+        
+        if 'Time Series (Daily)' not in data:
+            st.error(f"Error retrieving data for {symbol}: {data.get('Note', 'Unknown error')}")
+            return None
+        
+        df = pd.DataFrame(data['Time Series (Daily)']).T
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+        df = df.loc[start_date:end_date]
+        
+        df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col])
+        
+        st.write(f"Retrieved data for {symbol}. Shape: {df.shape}")
+        return df
+    
     except Exception as e:
         st.error(f"Error retrieving data for {symbol}: {str(e)}")
         return None
 
 symbol = 'AAPL'
-start_date = datetime(2023, 1, 1)
-end_date = datetime(2023, 12, 31)
-data = get_stock_data_pdr(symbol, start_date, end_date)
+end_date = datetime.now().date()
+start_date = end_date - timedelta(days=365)  # Get 1 year of data
+data = get_stock_data_alpha_vantage(symbol, start_date, end_date)
 if data is not None:
      st.write(data.head())
      st.line_chart(data['Close'])
