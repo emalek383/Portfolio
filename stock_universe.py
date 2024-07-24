@@ -199,7 +199,7 @@ class stock_universe():
         stock_data = download_data(self.stocks, self.start_date, self.end_date)
         ignored = []
         
-        if not self.stocks or not stock_data:
+        if not self.stocks or len(stock_data) == 0:
             ignored = self.stocks
         else:
             for ticker in self.stocks:
