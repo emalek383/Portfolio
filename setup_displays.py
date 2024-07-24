@@ -29,6 +29,10 @@ def setup_portfolio_display(display):
     """
         
     display.header("Portfolio Analysis")
+    if not state.universe or len(state.universe.stocks) < 2:
+        display.write("You need at least two stocks to build a portfolio.")
+        return display
+    
     stock_string = ", ".join(state.universe.stocks)
     display.write("Analysing portfolios consisting of " + stock_string)
     display.write(f'Risk free rate is {state.universe.risk_free_rate:.2%}')
