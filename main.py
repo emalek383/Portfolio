@@ -89,9 +89,16 @@ def download_data(stocks, start, end):
     st.write(f"Final DataFrame shape: {stockData.shape}")
     return stockData
 
-# Example usage in your Streamlit app:
-stocks = ['AAPL', 'GOOGL', 'MSFT']  # Replace with your actual stock list
-start_date = '2023-01-01'  # Replace with your actual start date
-end_date = '2023-12-31'  # Replace with your actual end date
-data = download_data(stocks, start_date, end_date)
+def download_single_day(stock, date):
+    try:
+        data = yf.download(stock, start=date, end=date + pd.Timedelta(days=1), progress=False)
+        st.write(f"Downloaded data shape for {stock} on {date}: {data.shape}")
+        return data
+    except Exception as e:
+        st.error(f"Error downloading data for {stock}: {str(e)}")
+        return pd.DataFrame()
+
+stock = 'AAPL'
+date = pd.Timestamp('2023-12-29')  # Last trading day of 2023
+data = download_single_day(stock, date)
 st.write(data)
