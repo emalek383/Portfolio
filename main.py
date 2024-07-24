@@ -48,6 +48,8 @@ setup_optimise_portfolio_form(optimise_portfolio_form)
 setup_portfolio_display(portfolio_display)
 setup_efficient_frontier_display(efficient_frontier_display)
 
+st.write(f"yfinance version: {yf.__version__}")
+
 def download_data(stocks, start, end):
     """
     Download stock data from Yahoo Finance using Ticker objects.
@@ -60,35 +62,26 @@ def download_data(stocks, start, end):
     
     st.write(f"Attempting to download data for {len(stocks)} stocks from {start} to {end}")
     
+    # Disable yfinance cache
+    yf.set_tz_cache_location(None)
+    
     progress_bar = st.progress(0)
     for i, stock in enumerate(stocks):
         st.write(f"Processing stock: {stock}")
-        ticker = yf.Ticker(stock)
         try:
-            chunk_start = start
-            stock_data = []
-            while chunk_start < end:
-                chunk_end = min(chunk_start + timedelta(days=365), end)
-                st.write(f"Downloading chunk for {stock}: {chunk_start} to {chunk_end}")
-                chunk = ticker.history(start=chunk_start, end=chunk_end, interval="1d")
-                st.write(f"Chunk data shape: {chunk.shape}")
-                if not chunk.empty:
-                    stock_data.append(chunk['Close'])
-                    st.write(f"Added chunk data for {stock}")
-                else:
-                    st.warning(f"Empty chunk for {stock} from {chunk_start} to {chunk_end}")
-                chunk_start = chunk_end + timedelta(days=1)
-                time.sleep(1)  # Add a small delay to avoid rate limiting
-            
-            if stock_data:
-                all_data[stock] = pd.concat(stock_data)
-                st.write(f"Successfully downloaded data for {stock}")
+            # Use yf.download instead of Ticker.history
+            data = yf.download(stock, start=start, end=end, progress=False)
+            st.write(f"Downloaded data shape for {stock}: {data.shape}")
+            if not data.empty:
+                all_data[stock] = data['Close']
+                st.write(f"Successfully added data for {stock}")
             else:
                 st.warning(f"No data available for {stock}")
         except Exception as e:
             st.error(f"Error downloading data for {stock}: {str(e)}")
         
         progress_bar.progress((i + 1) / len(stocks))
+        time.sleep(1)  # Add a small delay to avoid rate limiting
     
     st.write(f"Download process completed. Total stocks with data: {len(all_data)}")
     
