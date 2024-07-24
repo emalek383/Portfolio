@@ -51,14 +51,22 @@ setup_efficient_frontier_display(efficient_frontier_display)
 
 st.write(f"yfinance version: {yf.__version__}")
 
-def check_internet():
+def check_yahoo_finance():
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/AAPL"
     try:
-        response = requests.get('https://www.google.com', timeout=5)
-        st.write(f"Internet connection check: Status code {response.status_code}")
-        return response.status_code == 200
+        response = requests.get(url, timeout=5)
+        st.write(f"Yahoo Finance API check: Status code {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            st.write("Successfully retrieved data from Yahoo Finance API")
+            return True
+        else:
+            st.write("Failed to retrieve data from Yahoo Finance API")
+            return False
     except requests.RequestException as e:
-        st.error(f"Internet connection check failed: {str(e)}")
+        st.error(f"Yahoo Finance API check failed: {str(e)}")
         return False
 
-is_connected = check_internet()
-st.write(f"Internet connected: {is_connected}")
+
+yahoo_accessible = check_yahoo_finance()
+st.write(f"Yahoo Finance API accessible: {yahoo_accessible}")
