@@ -27,7 +27,7 @@ def download_data(stocks, start, end):
     Returns:
         stockData: pd.DataFrame with close of stock data
     """
-    yf.pdr_override()
+    #yf.pdr_override()
     yf.set_tz_cache_location(None)
         
     with suppress_stdout():
