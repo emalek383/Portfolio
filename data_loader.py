@@ -25,10 +25,10 @@ def download_data(stocks, start, end):
 
     """
     # Force appdirs to say that the cache dir is .cache
-    ad.user_cache_dir = lambda *args: CACHE_DIR
+    #ad.user_cache_dir = lambda *args: CACHE_DIR
 
     # Create the cache dir if it doesn't exist
-    Path(CACHE_DIR).mkdir(exist_ok=True)
+    #Path(CACHE_DIR).mkdir(exist_ok=True)
 
     all_data = {}
     
