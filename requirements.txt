@@ -1,4 +1,5 @@
 appdirs
 matplotlib
 yfinance==0.2.41
+pandas_datareader
 scipy
