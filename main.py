@@ -2,6 +2,7 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 import time
+import requests
 from datetime import datetime, timedelta
 from setup_forms import setup_stock_selection_form, setup_weights_form, setup_optimise_portfolio_form
 from setup_displays import setup_portfolio_display, setup_efficient_frontier_display
@@ -50,16 +51,14 @@ setup_efficient_frontier_display(efficient_frontier_display)
 
 st.write(f"yfinance version: {yf.__version__}")
 
-def get_stock_info(stock):
+def check_internet():
     try:
-        ticker = yf.Ticker(stock)
-        info = ticker.info
-        st.write(f"Retrieved info for {stock}")
-        return info
-    except Exception as e:
-        st.error(f"Error retrieving info for {stock}: {str(e)}")
-        return {}
+        response = requests.get('https://www.google.com', timeout=5)
+        st.write(f"Internet connection check: Status code {response.status_code}")
+        return response.status_code == 200
+    except requests.RequestException as e:
+        st.error(f"Internet connection check failed: {str(e)}")
+        return False
 
-stock = 'AAPL'
-info = get_stock_info(stock)
-st.write(info)
+is_connected = check_internet()
+st.write(f"Internet connected: {is_connected}")
