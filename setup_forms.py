@@ -59,7 +59,7 @@ def setup_stock_selection_form(form):
         if risk_free_rate:
             risk_free_rate /= 100
         process_stock_form(form, universe, start_date, end_date, risk_free_rate)
-        if len(state.universe.stocks) > 1:
+        if state.universe and len(state.universe.stocks) > 1:
             state.eff_frontier = state.universe.calc_efficient_frontier()
     
     return
