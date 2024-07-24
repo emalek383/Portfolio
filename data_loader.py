@@ -15,7 +15,7 @@ def suppress_stdout():
     finally:
         sys.stdout = old_stdout
 
-def get_data(stocks, start, end):
+def download_data(stocks, start, end):
     """
     Download stock data from yahoo finance.
     
