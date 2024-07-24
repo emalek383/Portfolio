@@ -1,4 +1,5 @@
 import yfinance as yf
+import pandas_datareader as pdr
 import streamlit as st
 import pandas as pd
 import time
@@ -51,22 +52,19 @@ setup_efficient_frontier_display(efficient_frontier_display)
 
 st.write(f"yfinance version: {yf.__version__}")
 
-def check_yahoo_finance():
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/AAPL"
+def get_stock_data_pdr(symbol, start_date, end_date):
     try:
-        response = requests.get(url, timeout=5)
-        st.write(f"Yahoo Finance API check: Status code {response.status_code}")
-        if response.status_code == 200:
-            data = response.json()
-            st.write("Successfully retrieved data from Yahoo Finance API")
-            return True
-        else:
-            st.write("Failed to retrieve data from Yahoo Finance API")
-            return False
-    except requests.RequestException as e:
-        st.error(f"Yahoo Finance API check failed: {str(e)}")
-        return False
+        data = pdr.get_data_yahoo(symbol, start=start_date, end=end_date)
+        st.write(f"Retrieved data for {symbol}. Shape: {data.shape}")
+        return data
+    except Exception as e:
+        st.error(f"Error retrieving data for {symbol}: {str(e)}")
+        return None
 
-
-yahoo_accessible = check_yahoo_finance()
-st.write(f"Yahoo Finance API accessible: {yahoo_accessible}")
+symbol = 'AAPL'
+start_date = datetime(2023, 1, 1)
+end_date = datetime(2023, 12, 31)
+data = get_stock_data_pdr(symbol, start_date, end_date)
+if data is not None:
+     st.write(data.head())
+     st.line_chart(data['Close'])
