@@ -42,7 +42,8 @@ efficient_frontier_display = st.container(border = False)
 if not state.loaded_stocks:
     process_stock_form(stock_selection_form)
     state.loaded_stocks = True
-    state.eff_frontier = state.universe.calc_efficient_frontier()
+    if len(state.universe.stocks) > 1:
+        state.eff_frontier = state.universe.calc_efficient_frontier()
     
 setup_stock_selection_form(stock_selection_form)
 setup_weights_form(weights_form)

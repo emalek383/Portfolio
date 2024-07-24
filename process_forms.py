@@ -21,17 +21,27 @@ def process_stock_form(stocks_form, universe = DEFAULT_STOCKS, start_date = DEFA
     Process the stock selection form by downloading stock data and setting up the stock universe,
     including max SR portfolio, min vol portfolio and a custom portfolio of uniform weights.
     Updates streamlit session_state automatically.
-    
-    Args:
-        stocks_form: st.form that corresponds to the stock selection form.
-        universe: stock universe that was chosen, passed as a comma-separated string.
-        start_date: start date of stocks to be considered, passed as datetime.
-        end_date: end date of stocks to be considered, passed as datetime.
-        risk_free_rate: chosen risk free rate. If left blank, will use bond data.
-        
-    Returns:
-        universe: stock_universe for the chosen stocks (or those which could be downloaded).
-        portfolios: max Sharpe Ratio, min vol and custom (uniform) portfolios of chosen stocks.
+
+    Parameters
+    ----------
+    stocks_form : st.form
+        Form that corresponds to the stock selection form..
+    universe : str, optional
+        Stock universe that was chosen, passed as a comma-separated string. The default is DEFAULT_STOCKS.
+    start_date : datetime, optional
+        Start date of stocks to be considered, passed as datetime.. The default is DEFAULT_START.
+    end_date : datetime, optional
+        End date of stocks to be considered, passed as datetime.. The default is DEFAULT_END.
+    risk_free_rate : float, optional
+        Chosen risk free rate. If None, will use bond data. The default is None.
+
+    Returns
+    -------
+    universe : stock_universe
+        Stock_universe for the chosen stocks (or those which could be downloaded).
+    portfolios : dict(portfolio)
+        Dictionary of max Sharpe Ratio, min vol and custom (uniform) portfolios of chosen stocks.
+
     """
     
     if start_date >= end_date:
@@ -76,11 +86,16 @@ def recompute_portfolio(weights):
     Recompute the custom portfolio data given new weights.
     Automatically updates portfolios in sreamlit session_state.
     
-    Args:
-        weights: list of new weights to be used for the custom portfolio.
-        
-    Returns:
-        None
+
+    Parameters
+    ----------
+    weights : list(float)
+        List of new weights to be used for the custom portfolio..
+
+    Returns
+    -------
+    None.
+
     """
         
     universe = state.universe
@@ -94,14 +109,20 @@ def optimise_custom_portfolio(optimiser, target):
     Optimise the custom portfolio according to the optimiser (min_vol or max_returns).
     Automatically updates portfolios in streamlit session_state.
     
-    Args:
-        optimiser: string corresponding to the chosen optimisation method.
-        target: float of target to be met while optimising.
-        
-    Returns:
-        None
+
+    Parameters
+    ----------
+    optimiser : str
+        String corresponding to the chosen optimisation method.
+    target : float
+        Target to be met while optimising.
+
+    Returns
+    -------
+    None.
+
     """
-        
+    
     universe = state.universe
     custom_portfolio = universe.optimise_portfolio(optimiser, target)
     custom_portfolio.name = "Custom"

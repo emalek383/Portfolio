@@ -13,18 +13,23 @@ DEFAULT_STOCKS = "GOOG, NVDA"
 now = dt.datetime.today()
 DEFAULT_START = now + relativedelta(years = -1)
 DEFAULT_END = now
+DATE_FORMAT = "DD/MM/YYYY"
 
 state = st.session_state
 
 def setup_stock_selection_form(form):
     """
     Setup the stock selection form.
-    
-    Args:
-        form: streamlit form, that will be the stock selection form.
-        
-    Returns:
-        None
+
+    Parameters
+    ----------
+    form : st.form
+        Will become the stock selection form.
+
+    Returns
+    -------
+    None.
+
     """
     
     universe = form.text_input("Enter your stocks, separated by commas",
@@ -34,11 +39,14 @@ def setup_stock_selection_form(form):
     start_date = form.date_input("Choose the start date for the analysis", 
                                  help = "Latest start date is 1 month ago",
                                  value = now + relativedelta(years = -1),
-                                 max_value = DEFAULT_START)
+                                 max_value = DEFAULT_START,
+                                 format = DATE_FORMAT)
+    
     end_date = form.date_input("Choose the end date for the analysis",
                                help = "Latest end date is today", 
                                value = DEFAULT_END,
-                               max_value = now)
+                               max_value = now,
+                               format = DATE_FORMAT)
 
     risk_free_rate = form.number_input("Enter a custom risk-free-rate, or leave blank to use 13-week T-bill",
                                        value = None,
@@ -51,7 +59,8 @@ def setup_stock_selection_form(form):
         if risk_free_rate:
             risk_free_rate /= 100
         process_stock_form(form, universe, start_date, end_date, risk_free_rate)
-        state.eff_frontier = state.universe.calc_efficient_frontier()
+        if len(state.universe.stocks) > 1:
+            state.eff_frontier = state.universe.calc_efficient_frontier()
     
     return
     
@@ -59,12 +68,17 @@ def setup_stock_selection_form(form):
 def setup_weights_form(form):
     """
     Setup the weights selection form.
-    
-    Args:
-        form: streamlit form that will become the weights selection form.
-        
-    Returns:
-        form: streamlit form that is the weights selection form.
+
+    Parameters
+    ----------
+    form : st.form
+        Will become the weights selection form.
+
+    Returns
+    -------
+    form : st.form
+        Weights selection form.
+
     """
     
     form.write("Change the relative weights of your portfolio.")
@@ -78,13 +92,19 @@ def setup_weights_form(form):
 def ask_for_weights(weights_form, default_weights):
     """
     Create the right number of weights input boxes for the given stock universe.
-    
-    Args:
-        weights_form: streamlit form where the weights input boxes will be displayed.
-        default_weights: default weights to populate the weights input boxes with.
-        
-    Returns:
-        weights: list of streamlit number input boxes for the weights.
+
+    Parameters
+    ----------
+    weights_form : st.form
+        Form where the weights input boxes will be displayed.
+    default_weights : list(float)
+        Default weights to populte the weights input boxes with.
+
+    Returns
+    -------
+    weights : list(st.number_input)
+        List of number input boxes for the weights.
+
     """
     
     stocks = state.universe.stocks
@@ -108,12 +128,17 @@ def setup_optimise_portfolio_form(form):
     """
     Setup the form, allowing a user to optimise their portfolio by minimising volatility, given a target return,
     or maximising the return, given a fixed volatility.
-    
-    Args:
-        form: streamlit form, that will be the optimise portfolio form.
-        
-    Returns:
-        form: streamlit form, that is the optimise portfolio form.
+
+    Parameters
+    ----------
+    form : st.form
+        Form that will become optimise portfolio form.
+
+    Returns
+    -------
+    form : st.form
+        Optimise portfolio form.
+
     """
     
     options_map = {"Maximise Returns": "max_returns", "Minimise Volatility": "min_vol"}
@@ -152,12 +177,19 @@ def setup_optimise_portfolio_form(form):
 def safe_float(value):
     """
     Convert to float and handle potential errors.
-    
-    Args:
-        value: value to be converted to float.
-        
-    Returns:
-        float of value.
+
+
+    Parameters
+    ----------
+    value : float
+        Value to be converted to float.
+
+    Returns
+    -------
+    float
+        float of the value passed;
+        None if value cannot be converted to float.
+
     """
     
     try:
@@ -168,15 +200,27 @@ def safe_float(value):
 def get_safe_bounds(min_val, max_val, current_val):
     """
     Calculate bounds for the slider, so as to include the min_val and max_val without rounding errors.
-    
-    Args:
-        min_val: float of minimum value for slider.
-        max_val: float of maximum value for slider.
-        current_val: float o current value for slider.
+
+    Parameters
+    ----------
+    min_val : float
+        Minimum value of slider.
+    max_val : float
+        Maximum value of slider.
+    current_val : float
+        Current value of slider.
+
+    Returns
+    -------
+    min_val : float
+        Minimum value of slider
+    max_val : float
+        Maximum value of slider
+    current_val : float
+        Current value of slider
         
-    Returns:
-        min_val, max_val, current_val: converted to float
     """
+    
     min_val = safe_float(min_val)
     max_val = safe_float(max_val)
     current_val = safe_float(current_val)

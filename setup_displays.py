@@ -15,11 +15,17 @@ def setup_portfolio_display(display):
     """
     Setup the portfolio display panel to show the stocks chosen, the set risk free rate and the performances of the
     Max Sharpe Ratio, Min Volatility and Custom Portfolios.
-    Args:
-        display: streamlit container in which to display portfolio info.
-        
-    Returns:
-        display: streamlit container with the updated display.
+
+    Parameters
+    ----------
+    display : st.container
+        Container in which to display portfolio info.
+
+    Returns
+    -------
+    display : st.container
+        Container with the updated display.
+
     """
         
     display.header("Portfolio Analysis")
@@ -37,16 +43,25 @@ def setup_efficient_frontier_display(display):
     """
     Setup the efficient frontier display panel to show a plot of the efficient frontier, the individual stocks
     in the chosen stock universe and the portfolios in session state (max_SR, min_vol and custom).
-    
-    Args:
-        display: streamlit container in which the information will be placed.
-        
-    Returns:
-        display: streamlit container with the displayed information.
+
+    Parameters
+    ----------
+    display : st.container
+        Container in which the information will be placed.
+
+    Returns
+    -------
+    display : st.container
+        Container with the display information.
+
     """
         
     display.markdown("### Efficient Frontier ###")
     
+    if not state.eff_frontier:
+        display.write("Need at least two stocks to have a viable portfolio.")
+        return display
+        
     eff_vols = state.eff_frontier[0]
     eff_excess_returns = state.eff_frontier[1]
         
@@ -81,13 +96,19 @@ def setup_efficient_frontier_display(display):
 def display_portfolio_performances(output, portfolios):
     """
     Show the performances of the portfolios passed.
-    
-    Args:
-        output: streamlit container in which the information will be placed.
-        portfolios: dictionary of portfolios (portfolio class) to display.
-        
-    Returns:
-        None
+
+
+    Parameters
+    ----------
+    output : st.container
+        Container in which the information will be placed.
+    portfolios : dict(portfolio)
+        Dictionary of portfolios to display.
+
+    Returns
+    -------
+    None.
+
     """
         
     output.markdown("#### Performance ####")
@@ -100,15 +121,22 @@ def display_portfolio_performances(output, portfolios):
     output.table(joined_perf_df.style.format(format_map))
     
 def display_portfolio_weights(output, portfolios, incl_table = False):
-    """Show the weights of the portfolios passed in a pie chart and (optionally) in an expandable table.
-    
-    Args:
-        output: streamlit container in which the information will be placed.
-        portfolios: dictionary of portfolios (portfolio class) to display.
-        incl_table: Boolean of whether to show a table with the weights info (in an expander).
-        
-    Returns:
-        None
+    """
+    Show the weights of the portfolios passed in a pie chart and (optionally) in an expandable table.
+
+    Parameters
+    ----------
+    output : st.container
+        Container in which the information will be placed.
+    portfolios : dict(portfolio)
+        Dictionary of portfolios whose information will be displayed.
+    incl_table : bool, optional
+        Boolean of whether to show a table with the weights info (in an expander). The default is False.
+
+    Returns
+    -------
+    None.
+
     """
     
     output.markdown("#### Allocation ####")
