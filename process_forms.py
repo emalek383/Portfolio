@@ -58,13 +58,19 @@ def process_stock_form(stocks_form, universe = DEFAULT_STOCKS, start_date = DEFA
         stocks_form.error("Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio.")
     
     universe = stock_universe(cleaned_stocks, start_date, end_date, risk_free_rate = risk_free_rate)
+    if not universe:
+        stocks_form.error("Could not build stock uniform")
+        return None, None
+    
     ignored = universe.get_data()
     
     if len(ignored) > 0:
         stocks_form.error(f"Failed to download {ignored}. Check the tickers. Will try to continue without them.")
+        return None, None
             
     if len(universe.stocks) < 2:
         stocks_form.error("Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio.")
+        return None, None
     else:
         universe.calc_mean_returns_cov()
         if risk_free_rate == None:
