@@ -1,4 +1,4 @@
 appdirs
 matplotlib
-yfinance = 0.2.31b2
+yfinance>=0.2.31b2
 scipy
