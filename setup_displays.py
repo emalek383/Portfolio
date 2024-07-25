@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
+from process_forms import process_stock_form
 
 state = st.session_state
 
@@ -24,6 +25,8 @@ def setup_portfolio_display(display):
     display.header("Portfolio Analysis")
     if not state.universe or len(state.universe.stocks) < 2:
         display.write("You need at least two stocks to build a portfolio.")
+        process_stock_form()
+        
         return display
     
     stock_string = ", ".join(state.universe.stocks)
