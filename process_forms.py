@@ -44,41 +44,51 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         universe.bonds_data = bonds_data
      
     else:
-        if start_date >= end_date:
-            errors += "You must pick a start date before the end date."
-            return errors
-    
-        stocks = stock_list.split(",")
-        cleaned_stocks = []
-        for stock in stocks:
-            stock = stock.strip()
-            if stock:
-                cleaned_stocks.append(stock)
-        
-        if len(cleaned_stocks) < 2:
-            errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
-            return errors
-        
-        universe = StockUniverse(cleaned_stocks.copy(), start_date, end_date, risk_free_rate = risk_free_rate)
-        if not universe:
-            errors += "Could not build stock universe. Try again."
-            return errors
-        
-        ignored = universe.get_data()
-    
-        if len(ignored) > 0:
-            if len(ignored) == 1:
-                ignored_str = ignored[0]
-            else:
-                ignored_str = ", ".join(ignored)
-            errors += f"Failed to download {ignored_str}. Check the tickers. Will try to continue without them.\n"
-            if len(ignored) == len(cleaned_stocks):
-                errors += "Could not download any stocks. There may be an issue with the Yahoo Finance connection."
-                return errors
+        # If stocks, start and end date are the same as loaded, just use the loaded data
+        if (state.universe and state.universe.stocks and state.universe.stocks == stock_list and 
+            state.universe.start_date and state.universe.start_date == start_date and
+            state.universe.end_date and state.universe.end_date == end_date):
             
-        if len(universe.stocks) < 2:
-            errors += "Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio."
-            return errors
+            state.universe.risk_free_rate = risk_free_rate
+        
+        else: # process form
+            if start_date >= end_date:
+                errors += "You must pick a start date before the end date."
+                return errors
+    
+            stocks = stock_list.split(",")
+            cleaned_stocks = []
+            for stock in stocks:
+                stock = stock.strip()
+                if stock:
+                    cleaned_stocks.append(stock)
+        
+            if len(cleaned_stocks) < 2:
+                errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
+                return errors
+        
+            universe = StockUniverse(cleaned_stocks.copy(), start_date, end_date, risk_free_rate = risk_free_rate)
+            if not universe:
+                errors += "Could not build stock universe. Try again."
+                return errors
+        
+            ignored = universe.get_data()
+    
+            if len(ignored) > 0:
+                if len(ignored) == 1:
+                    ignored_str = ignored[0]
+                else:
+                    ignored_str = ", ".join(ignored)
+                    errors += f"Failed to download {ignored_str}. Check the tickers. Will try to continue without them.\n"
+                
+                if len(ignored) == len(cleaned_stocks):
+                    errors += "Could not download any stocks. There may be an issue with the Yahoo Finance connection."
+                    
+                    return errors
+            
+            if len(universe.stocks) < 2:
+                errors += "Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio."
+                return errors
 
     universe.calc_mean_returns_cov()
     if risk_free_rate == None:
