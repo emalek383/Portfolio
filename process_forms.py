@@ -4,7 +4,6 @@ from data_loader import load_default_stocks, load_default_bonds
 
 state = st.session_state
 
-@st.cache_data
 def process_stock_form(stock_list = None, start_date = None, end_date = None, risk_free_rate = None):
     """
     Process the stock selection form by downloading stock data and setting up the stock universe,
