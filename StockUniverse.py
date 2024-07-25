@@ -268,7 +268,7 @@ class StockUniverse():
         vols = []
         excess_returns = []
         for idx, stock in enumerate(self.stocks):
-            excess_returns.append( TRADING_DAYS * (self.mean_returns[idx]) - self.risk_free_rate )
+            excess_returns.append( TRADING_DAYS * (self.mean_returns.iloc[idx]) - self.risk_free_rate )
             vols.append( np.sqrt( TRADING_DAYS * self.cov_matrix[stock][stock]) )
         return vols, excess_returns
     
