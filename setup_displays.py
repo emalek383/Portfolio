@@ -27,7 +27,7 @@ def setup_portfolio_display(display):
         return display
     
     stock_string = ", ".join(state.universe.stocks)
-    display.write(f"Analysing portfolios consisting of {stock_string} using data from {state.universe.start_date.strftime('%d-%m-%Y')} to {state.universe.end_date.strftime('%d-%m-%Y')}.")
+    display.write(f"Analysing portfolios consisting of {stock_string} using data from {state.universe.start_date.strftime('%d/%m/%Y')} to {state.universe.end_date.strftime('%d/%m/%Y')}.")
     display.write(f'Risk free rate is {state.universe.risk_free_rate:.2%}.')
     
     display.markdown("### Max Sharpe Ratio, Min Vol and Custom Portfolios ###")
