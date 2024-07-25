@@ -44,25 +44,27 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         universe.bonds_data = bonds_data
      
     else:
+        # Extract stock lis
+        stocks = stock_list.split(",")
+        cleaned_stocks = []
+        for stock in stocks:
+            stock = stock.strip()
+            if stock:
+                cleaned_stocks.append(stock)
+        
         # If stocks, start and end date are the same as loaded, just use the loaded data
-        if (state.universe and state.universe.stocks and state.universe.stocks == stock_list and 
+        
+        if (state.universe and state.universe.stocks and set(state.universe.stocks) == set(cleaned_stocks) and 
             state.universe.start_date and state.universe.start_date == start_date and
             state.universe.end_date and state.universe.end_date == end_date):
-            
-            state.universe.risk_free_rate = risk_free_rate
+            universe = state.universe
+            universe.risk_free_rate = risk_free_rate
         
         else: # process form
             if start_date >= end_date:
                 errors += "You must pick a start date before the end date."
                 return errors
     
-            stocks = stock_list.split(",")
-            cleaned_stocks = []
-            for stock in stocks:
-                stock = stock.strip()
-                if stock:
-                    cleaned_stocks.append(stock)
-        
             if len(cleaned_stocks) < 2:
                 errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
                 return errors
