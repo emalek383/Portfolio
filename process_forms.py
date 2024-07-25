@@ -60,28 +60,25 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
             errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
             return errors
         
-        universe = StockUniverse(cleaned_stocks, start_date, end_date, risk_free_rate = risk_free_rate)
+        universe = StockUniverse(cleaned_stocks.copy(), start_date, end_date, risk_free_rate = risk_free_rate)
         if not universe:
             errors += "Could not build stock universe. Try again."
             return errors
         
-        try:
-            ignored = universe.get_data()
+        ignored = universe.get_data()
     
-            if len(ignored) > 0:
-                if len(ignored) == 1:
-                    ignored_str = ignored[0]
-                else:
-                    ignored_str = ", ".join(ignored)
-                errors += f"Failed to download {ignored_str}. Check the tickers. Will try to continue without them.\n"
-                if ignored == cleaned_stocks:
-                    errors += "Could not download any stocks. There may be an issue with the Yahoo Finance connection."
-            
-            if len(universe.stocks) < 2:
-                errors += "Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio."
+        if len(ignored) > 0:
+            if len(ignored) == 1:
+                ignored_str = ignored[0]
+            else:
+                ignored_str = ", ".join(ignored)
+            errors += f"Failed to download {ignored_str}. Check the tickers. Will try to continue without them.\n"
+            if len(ignored) == len(cleaned_stocks):
+                errors += "Could not download any stocks. There may be an issue with the Yahoo Finance connection."
                 return errors
-        except:
-            errors += "Could not download any stocks. Check the tickers and Yahoo Finance connection."
+            
+        if len(universe.stocks) < 2:
+            errors += "Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio."
             return errors
 
     universe.calc_mean_returns_cov()
