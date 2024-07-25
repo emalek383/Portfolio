@@ -1,13 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Jul 14 18:31:49 2024
-
-@author: emanu
-"""
-
 import numpy as np
 import scipy.optimize as sc
-#from stock_universe import portfolio
 from helper_functions import negative_SR, portfolio_vol, portfolio_excess_returns
 from helper_functions import negative_portfolio_excess_returns
 
@@ -15,12 +7,18 @@ def maximise_SR(portfolio, constraint_set = (0, 1)):
     """
     Maximise Sharpe Ratio by altering the weights of passed portfolio.
     
-    Args:
-        portfolio: a portfolio class instance, whose weights will be altered to maximise the Sharpe Ratio.
-        constraint_set: allowed max and min of weights.
+    Parameters
+    ----------
+        portfolio : Portfolio
+            Portfolio whose weights will be altered to maximise the Sharpe Ratio.
+        constraint_set : list(float, float), optional
+            Allowed min and max of weights. The default is (0, 1).
         
-    Returns:
-        portfolio: portfolio with weights optimised to maximise the Sharpe Ratio.
+    Returns
+    -------
+        portfolio : Portfolio
+            Portfolio whose weights are optimised to maximise the Sharpe Ratio.
+            
     """
     
     num_assets = len(portfolio.universe.stocks)
@@ -39,15 +37,21 @@ def maximise_SR(portfolio, constraint_set = (0, 1)):
 def minimise_vol(portfolio, constraint_set = (0, 1)):
     """
     Minimise the portfolio variance by altering the weights in passed portfolio.
-    
-    Args:
-        portfolio: a portfolio class instance, whose weights will be altered to minimise the volatility.
-        constraint_set: allowed max and min of weights.
-        
-    Returns:
-        portfolio: portfolio with weights optimised to minimise the volatility.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Portfolio whose weights will be altered to minimise the volatility.
+    constraint_set : list(float, float), optional
+        Allowed min and max of weights. The default is (0, 1).
+
+    Returns
+    -------
+    portfolio : Portfolio
+        Portfolio whose weights are optimised to minimise the volatility.
+
     """
-        
+     
     num_assets = len(portfolio.universe.stocks)
     args = (portfolio)
     constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
@@ -61,21 +65,30 @@ def minimise_vol(portfolio, constraint_set = (0, 1)):
     
     return portfolio
         
-def efficient_portfolio(portfolio, returns_target, constraint_set = (0, 1)):
+def efficient_portfolio(portfolio, excess_returns_target, constraint_set = (0, 1)):
     """
     For a fixed return target, optimise the portfolio for min volatility.
-    
-    Args:
-        portfolio: a portfolio class instance, whose weights will be altered to minimise the volatility.
-        constraint_set: allowed max and min of weights.
-        
-    Returns:
-        portfolio: portfolio with weights optimised to minimise the volatility.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Portfolio whose weights will be altered to minimise the volatility.
+    returns_target : float
+        Target excess return that the portfolio should achieve.
+    constraint_set : List(float, float), optional
+        Allowed min and max of weights. The default is (0, 1).
+
+    Returns
+    -------
+    portfolio : Portfolio
+        Portfolio whose weights are optimised to minimise the volatility, while reaching the excess returns target.
+
     """
+    
     num_assets = len(portfolio.universe.stocks)
     args = (portfolio)
     constraints = ({'type': 'eq',
-                    'fun': lambda x: portfolio_excess_returns(x, portfolio) - returns_target},
+                    'fun': lambda x: portfolio_excess_returns(x, portfolio) - excess_returns_target},
                    {'type': 'eq',
                     'fun': lambda x: np.sum(x) - 1})
     bounds = tuple(constraint_set for asset in range(num_assets))
@@ -90,14 +103,23 @@ def efficient_portfolio(portfolio, returns_target, constraint_set = (0, 1)):
 def maximise_returns(portfolio, vol_target, constraint_set = (0, 1)):
     """
     For a fixed volatility target, optimise the portfolio for max returns.
-        
-    Args:
-        portfolio: a portfolio class instance, whose weights will be altered to maximise the returns.
-        constraint_set: allowed max and min of weights.
-    
-    Returns:
-        portfolio: portfolio with weights optimised to maximise the returns.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Portfolio whose weights will be altered to maximise the returns.
+    vol_target : float
+        Target volatility that the portfolio can have.
+    constraint_set : list(float, float), optional
+        Allowed min and max of weights. The default is (0, 1).
+
+    Returns
+    -------
+    portfolio : Portfolio
+        Portfolio with weights optimised to maximise the returns while hitting the volatility target.
+
     """
+ 
     num_assets = len(portfolio.universe.stocks)
     args = (portfolio)
     constraints = ({'type': 'eq',

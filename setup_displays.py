@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jul 17 20:47:16 2024
-
-@author: emanu
-"""
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
@@ -34,8 +27,8 @@ def setup_portfolio_display(display):
         return display
     
     stock_string = ", ".join(state.universe.stocks)
-    display.write("Analysing portfolios consisting of " + stock_string)
-    display.write(f'Risk free rate is {state.universe.risk_free_rate:.2%}')
+    display.write(f"Analysing portfolios consisting of {stock_string} using data from {state.universe.start_date.strftime('%d-%m-%Y')} to {state.universe.end_date.strftime('%d-%m-%Y')}.")
+    display.write(f'Risk free rate is {state.universe.risk_free_rate:.2%}.')
     
     display.markdown("### Max Sharpe Ratio, Min Vol and Custom Portfolios ###")
     display_portfolio_performances(display, state.portfolios)

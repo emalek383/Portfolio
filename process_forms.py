@@ -1,91 +1,103 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jul 15 09:22:29 2024
-
-@author: emanu
-"""
 import streamlit as st
-import datetime as dt
-from dateutil.relativedelta import relativedelta
-from stock_universe import stock_universe, portfolio
-
-DEFAULT_STOCKS = "GOOG, NVDA"
-now = dt.datetime.today()
-DEFAULT_START = now + relativedelta(years = -1)
-DEFAULT_END = now
+from StockUniverse import StockUniverse, Portfolio
+from data_loader import load_default_stocks, load_default_bonds
 
 state = st.session_state
 
-def process_stock_form(stocks_form, universe = DEFAULT_STOCKS, start_date = DEFAULT_START, end_date = DEFAULT_END, risk_free_rate = None):
+@st.cache_data
+def process_stock_form(stock_list = None, start_date = None, end_date = None, risk_free_rate = None):
     """
     Process the stock selection form by downloading stock data and setting up the stock universe,
     including max SR portfolio, min vol portfolio and a custom portfolio of uniform weights.
+    If stock_list, start_date or end_date are missing, will load saved stocks.
     Updates streamlit session_state automatically.
 
     Parameters
     ----------
     stocks_form : st.form
         Form that corresponds to the stock selection form..
-    universe : str, optional
-        Stock universe that was chosen, passed as a comma-separated string. The default is DEFAULT_STOCKS.
+    stock_list : str, optional
+        Stock universe that was chosen, passed as a comma-separated string. The default is None.
     start_date : datetime, optional
-        Start date of stocks to be considered, passed as datetime.. The default is DEFAULT_START.
+        Start date of stocks to be considered, passed as datetime.. The default is None.
     end_date : datetime, optional
-        End date of stocks to be considered, passed as datetime.. The default is DEFAULT_END.
+        End date of stocks to be considered, passed as datetime.. The default is None.
     risk_free_rate : float, optional
         Chosen risk free rate. If None, will use bond data. The default is None.
 
     Returns
     -------
-    universe : stock_universe
-        Stock_universe for the chosen stocks (or those which could be downloaded).
-    portfolios : dict(portfolio)
-        Dictionary of max Sharpe Ratio, min vol and custom (uniform) portfolios of chosen stocks.
+    errors : str
+        String of error messages for user.
 
     """
     
-    if start_date >= end_date:
-        stocks_form.error("You must pick a start date before the end date.")
-        return
+    errors = ""
     
-    stocks = universe.split(",")
-    cleaned_stocks = []
-    for stock in stocks:
-        stock = stock.strip()
-        cleaned_stocks.append(stock)
-        
-    if len(cleaned_stocks) < 2:
-        stocks_form.error("Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio.")
-    
-    universe = stock_universe(cleaned_stocks, start_date, end_date, risk_free_rate = risk_free_rate)
-    if not universe:
-        stocks_form.error("Could not build stock uniform")
-        return None, None
-    
-    ignored = universe.get_data()
-    
-    if len(ignored) > 0:
-        stocks_form.error(f"Failed to download {ignored}. Check the tickers. Will try to continue without them.")
-        return None, None
-            
-    if len(universe.stocks) < 2:
-        stocks_form.error("Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio.")
-        return None, None
+    # If stock_list, start_date or end_date are missing, use saved
+    if not stock_list or not start_date or not end_date:
+        stock_data = load_default_stocks()
+        bonds_data = load_default_bonds()
+        stocks = list(stock_data.columns)
+        start_date, end_date = stock_data.index[0], stock_data.index[-1]
+        universe = StockUniverse(stocks, start_date, end_date)
+        universe.stock_data = stock_data
+        universe.bonds_data = bonds_data
+     
     else:
-        universe.calc_mean_returns_cov()
-        if risk_free_rate == None:
-            universe.calc_risk_free_rate()
+        if start_date >= end_date:
+            errors += "You must pick a start date before the end date."
+            return errors
+    
+        stocks = stock_list.split(",")
+        cleaned_stocks = []
+        for stock in stocks:
+            stock = stock.strip()
+            if stock:
+                cleaned_stocks.append(stock)
+        
+        if len(cleaned_stocks) < 2:
+            errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
+            return errors
+        
+        universe = StockUniverse(cleaned_stocks, start_date, end_date, risk_free_rate = risk_free_rate)
+        if not universe:
+            errors += "Could not build stock universe. Try again."
+            return errors
+        
+        try:
+            ignored = universe.get_data()
+    
+            if len(ignored) > 0:
+                if len(ignored) == 1:
+                    ignored_str = ignored[0]
+                else:
+                    ignored_str = ", ".join(ignored)
+                errors += f"Failed to download {ignored_str}. Check the tickers. Will try to continue without them.\n"
+                if ignored == cleaned_stocks:
+                    errors += "Could not download any stocks. There may be an issue with the Yahoo Finance connection."
+            
+            if len(universe.stocks) < 2:
+                errors += "Less than two stocks downloaded. Need at least two stocks to construct a meaningful portfolio."
+                return errors
+        except:
+            errors += "Could not download any stocks. Check the tickers and Yahoo Finance connection."
+            return errors
+
+    universe.calc_mean_returns_cov()
+    if risk_free_rate == None:
+        universe.calc_risk_free_rate()
                     
-        portfolios = {'max_SR': universe.max_SR_portfolio, 'min_vol': universe.min_vol_portfolio}
+    portfolios = {'max_SR': universe.max_SR_portfolio, 'min_vol': universe.min_vol_portfolio}
         
-        # Custom Portfolio: initialise as uniform portflio
-        custom_portfolio = portfolio(universe, name = "Custom")
-        portfolios['custom'] = custom_portfolio
+    # Custom Portfolio: initialise as uniform portflio
+    custom_portfolio = Portfolio(universe, name = "Custom")
+    portfolios['custom'] = custom_portfolio
         
-        state.universe = universe
-        state.portfolios = portfolios
+    state.universe = universe
+    state.portfolios = portfolios
         
-        return universe, portfolios  
+    return errors
     
 def recompute_portfolio(weights):
     """
@@ -105,7 +117,7 @@ def recompute_portfolio(weights):
     """
         
     universe = state.universe
-    custom_portfolio = portfolio(universe, name = "Custom", weights = weights)
+    custom_portfolio = Portfolio(universe, name = "Custom", weights = weights)
     state.portfolios['custom'] = custom_portfolio
     
     return None

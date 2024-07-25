@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jul 17 20:40:43 2024
-
-@author: emanu
-"""
 import streamlit as st
 import datetime as dt
 from dateutil.relativedelta import relativedelta
@@ -58,7 +52,10 @@ def setup_stock_selection_form(form):
         state.loaded_stocks = True
         if risk_free_rate:
             risk_free_rate /= 100
-        process_stock_form(form, universe, start_date, end_date, risk_free_rate)
+        errors = process_stock_form(universe, start_date, end_date, risk_free_rate)
+        if errors:
+            form.error(errors)
+        
         if state.universe and len(state.universe.stocks) > 1:
             state.eff_frontier = state.universe.calc_efficient_frontier()
     
