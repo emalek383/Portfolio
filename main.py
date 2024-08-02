@@ -11,7 +11,7 @@ def load_css(file_name):
         css_content = f.read()
         st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
-@st.cache_data
+#@st.cache_data
 def update_factor_models():
     check_latest()
     
