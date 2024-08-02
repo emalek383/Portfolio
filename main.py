@@ -35,16 +35,16 @@ if 'constrained_eff_frontier' not in state:
     state.constrained_eff_frontier = None
 
 with st.sidebar:        
-    stock_select_expander = st.expander(label = "Select stocks for your portfolio", expanded = True)
+    stock_select_expander = st.expander(label = "Select stocks for portfolio", expanded = True)
     stock_selection_form = stock_select_expander.form(border = False, key = "stock_form")
     
     factor_analysis_expander = st.expander(label = "Run factor analysis", expanded = True)
     factor_analysis_form = factor_analysis_expander.container(border = False)
     
-    optimise_expander = st.expander(label = "Optimise your portfolio", expanded = True)
+    optimise_expander = st.expander(label = "Optimise portfolio", expanded = True)
     optimise_portfolio_form = optimise_expander.container(border = False)
     
-    weights_expander = st.expander(label = "Manually adjust your portfolio", expanded = False)
+    weights_expander = st.expander(label = "Manually adjust portfolio", expanded = False)
     weights_form = weights_expander.container(border = False)
 
 portfolio_display = st.container(border = False)
