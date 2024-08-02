@@ -161,7 +161,8 @@ def optimise_custom_portfolio(optimiser, target, factor_model = None, factor_bou
     universe = state.universe
     
     try:
-        custom_portfolio = universe.optimise_portfolio(optimiser, target, factor_bounds)        
+        custom_portfolio = universe.optimise_portfolio(optimiser, target, factor_bounds)
+        st.success("Successfully optimised your custom portfolio.")
     except Exception:
         st.error("Unable to optimise portfolio according to the target and am now optimising without the factor constraints.")
         custom_portfolio = universe.optimise_portfolio(optimiser, target)
@@ -188,6 +189,8 @@ def optimise_custom_portfolio(optimiser, target, factor_model = None, factor_bou
                 state.portfolios['constrained_max_SR'] = max_SR_portfolio
             if min_vol_portfolio and not same_weights(state.portfolios['min_vol'].weights, min_vol_portfolio.weights):
                 state.portfolios['constrained_min_vol'] = min_vol_portfolio
+                
+            st.success("Calculated the efficient frontier subject to the factor constraints.")
                 
         except Exception:
             st.error("Unable to find minimum volatility portfolio while obeying the constraints. This suggests that no portfolios satisfy your factor constraints. Therefore, your factor constraints have been ignored.")
