@@ -15,7 +15,7 @@ def load_css(file_name):
 def update_factor_models():
     check_latest()
     
-update_factor_models()
+# update_factor_models()
 
 load_css('styles/style.css')    
 
