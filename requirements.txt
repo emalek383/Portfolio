@@ -3,3 +3,9 @@ matplotlib
 yfinance==0.2.41
 cvxpy
 statsmodels
+requests
+os
+io
+zipfile
+json
+re
