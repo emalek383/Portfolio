@@ -1,9 +1,10 @@
 import streamlit as st
 import datetime as dt
 from dateutil.relativedelta import relativedelta
-from process_forms import process_stock_form, recompute_portfolio, optimise_custom_portfolio
+from process_forms import process_stock_form, recompute_portfolio, optimise_custom_portfolio, process_factor_analysis_form, clear_factor_analysis
 
 DEFAULT_STOCKS = "GOOG, NVDA"
+DEFAULT_STOCKS = "GOOG, NVDA, LLY, MRK, MSFT, AAPL, AMZN, TSLA, NFLX, ADBE, UBS, JPM, XOM, GS, BRK-B, A, AMD, MMM, AOS, AES, AFL, APD, ABNB, LNT, ALLE, ARE, A, AMCR, AEE, AEP, AMT, AWK"
 now = dt.datetime.today()
 DEFAULT_START = now + relativedelta(years = -1)
 DEFAULT_END = now
@@ -55,11 +56,9 @@ def setup_stock_selection_form(form):
         errors = process_stock_form(universe, start_date, end_date, risk_free_rate)
         if errors:
             form.error(errors)
-        
-        if state.universe and len(state.universe.stocks) > 1:
-            state.eff_frontier = state.universe.calc_efficient_frontier()
+            st.write(errors)
     
-    return
+    return form
     
 
 def setup_weights_form(form):
@@ -83,7 +82,7 @@ def setup_weights_form(form):
     
     form.write("Change the relative weights of your portfolio.")
     weights = ask_for_weights(form, state.portfolios['custom'].weights)
-    form.button(label = "Recalculate",
+    form.button(label = "Calculate Performance",
                 on_click = recompute_portfolio,
                 args = (weights, ))
 
@@ -123,6 +122,21 @@ def ask_for_weights(weights_form, default_weights):
                                         step = 0.01))
             
     return weights      
+
+def setup_factor_analysis_form(form):    
+    if not state.universe or len(state.universe.stocks) < 2:
+        return form
+    
+    factor_model = form.radio(label = "Choose the factor model you want to use", 
+                              options = ['ff3', 'ff4', 'ff5', 'ff6'], 
+                              format_func = format_factor_choice,
+                              )
+    
+    col1, col2 = form.columns(2)
+    with col1:
+        st.button(label = "Run", on_click = process_factor_analysis_form, args = (factor_model, ) )
+    with col2:
+        st.button(label = "Clear", on_click = clear_factor_analysis)
 
 def setup_optimise_portfolio_form(form):
     """
@@ -172,9 +186,61 @@ def setup_optimise_portfolio_form(form):
                          step = 0.01,
                          help = helper)
     
-    form.button(label = "Optimise", on_click = optimise_custom_portfolio, args = (chosen_optimiser, target, ))
-
+    factor_bounds = {}
+    if state.factor_model:
+        form.divider()
+        form.write("Allowed exposure on factors:")
+        factor_list, factor_bounds_values = setup_factor_bounds(form, state.factor_model)
+        
+        factor_ranges = get_default_factor_bounds(state.universe)
+        for idx, factor in enumerate(factor_list):
+            factor_bounds_values[idx] = list(factor_bounds_values[idx])
+            if factor_bounds_values[idx] == factor_ranges[factor]:
+                continue
+            else:
+                if factor_bounds_values[idx][0] == factor_ranges[factor][0]:
+                    factor_bounds_values[idx][0] = None
+                if factor_bounds_values[idx][1] == factor_ranges[factor][1]:
+                    factor_bounds_values[idx][1] = None
+            
+            factor_bounds[factor] = factor_bounds_values[idx]
+    
+    form.button(label = "Optimise", on_click = optimise_custom_portfolio, args = (chosen_optimiser, target, state.factor_model, factor_bounds) )
+    
     return form
+
+def format_factor_choice(option):
+    format_map = {'ff3': 'Fama-French 3-Factor', 'ff4': 'Fama-French 3-Factor + Momentum', 'ff5': 'Fama-French 5-Factor', 'ff6': 'Fama-French 5-Factor + Momentum'}
+    return format_map[option]
+
+def setup_factor_bounds(form, factor_model):
+    factor_map = {'ff3': ['Mkt-RF', 'SMB', 'HML']}
+    factor_map['ff4'] = factor_map['ff3'] + ['Mom']
+    factor_map['ff5'] = factor_map['ff3'] + ['RMW', 'CMA']
+    factor_map['ff6'] = factor_map['ff5'] + ['Mom']
+    
+    factor_bounds = []
+    factor_ranges = get_default_factor_bounds(state.universe)
+    for factor in factor_map[factor_model]:
+        factor_bounds.append(form.slider(label = factor, #f"Allowed exposure on {factor}",
+                                         value = factor_ranges[factor],
+                                         min_value = factor_ranges[factor][0],
+                                         max_value = factor_ranges[factor][1],
+                                         step = 0.1
+                                         ) )
+        
+    return factor_map[factor_model], factor_bounds
+
+def get_default_factor_bounds(universe):
+    ranges = universe.calc_factor_ranges()
+    default_bounds = {}
+    for factor in ranges.index:
+        min_val = ranges.loc[factor, 'min']
+        max_val = ranges.loc[factor, 'max']
+        range_width = max_val - min_val
+        default_bounds[factor] = (min_val - 0.1*range_width, max_val + 0.1*range_width)
+        
+    return default_bounds
 
 def safe_float(value):
     """

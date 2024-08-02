@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 from dateutil.relativedelta import relativedelta
-from helper_functions import get_mean_returns
+from helper_functions import get_mean_returns, convert_to_date
 from optimisers import maximise_SR, minimise_vol, efficient_portfolio, maximise_returns
 from data_loader import download_data
+from FactorAnalysis import FactorAnalysis
 
 TRADING_DAYS = 252
 
@@ -16,7 +17,7 @@ class StockUniverse():
     Attributes
     ----------
     stocks : list(str)
-        Tickers of stocks in the stock universe
+        List of tickers of stocks in the stock universe
     start_date : datetime
         Start date of stock universe (important for getting data)
     end_date : datetime
@@ -123,6 +124,7 @@ class StockUniverse():
         self.mean_returns = mean_returns
         self.cov_matrix = cov_matrix
         self.risk_free_rate = risk_free_rate
+        self.factor_analysis = None
         if self.mean_returns and self.cov_matrix:
             self.update_min_max()
             self.max_SR_portfolio = self.calc_max_SR_portfolio()
@@ -150,8 +152,8 @@ class StockUniverse():
         
         self.min_vol = self.min_vol_portfolio.vol
         self.max_vol = max(self.individual_stock_portfolios()[0])
-        
-    def optimise_portfolio(self, optimiser, target):
+    
+    def optimise_portfolio(self, optimiser, target, factor_bounds = None):
         """
         Finds the best weights in a portfolio in order to reach the target vol or excess returns,
         as specified by optimiser.
@@ -170,11 +172,20 @@ class StockUniverse():
 
         """
         
+        
         optimised_portfolio = Portfolio(self)
+        
         if optimiser == 'min_vol':
-            optimised_portfolio = efficient_portfolio(optimised_portfolio, target)
+            try:
+                optimised_portfolio = efficient_portfolio(optimised_portfolio, target, factor_bounds)
+            except Exception as e:
+                print(f"Got an error at the level of StockUniverse.optimise_portfolio(). Error {str(e)}")
+                raise ValueError(str(e))
         else:
-            optimised_portfolio = maximise_returns(optimised_portfolio, target)
+            try:
+                optimised_portfolio = maximise_returns(optimised_portfolio, target, factor_bounds)
+            except Exception as e:
+                raise ValueError(str(e))
             
         return optimised_portfolio
     
@@ -206,7 +217,11 @@ class StockUniverse():
                 
         self.stock_data = stock_data
         
-        self.bonds_data = download_data(['^IRX'], self.start_date, self.end_date)
+        self.start_date = convert_to_date(self.stock_data.index[0])
+        self.end_date = convert_to_date(self.stock_data.index[-1])
+        
+        bonds_data = download_data(['^IRX'], self.start_date, self.end_date)
+        self.bonds_data = bonds_data.rename('^IRX')
         
         return ignored
         
@@ -326,11 +341,45 @@ class StockUniverse():
         for target in target_excess_returns:
             # for each efficient portfolio, obtain the portfolio volatility
             eff_portfolio = Portfolio(self)
-            eff_portfolio = efficient_portfolio(eff_portfolio, target)
-            efficient_frontier_vols.append(eff_portfolio.vol)
+            try:
+                eff_portfolio = efficient_portfolio(eff_portfolio, target,)
+                efficient_frontier_vols.append(eff_portfolio.vol)
+                if self.max_SR_portfolio and self.max_SR_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
+                    self.max_SR_portfolio = eff_portfolio
+                    self.max_SR_portfolio.name = 'Max Sharpe Ratio'
+            except:
+                efficient_frontier_vols.append(None)
         
         return efficient_frontier_vols, target_excess_returns
+            
+    def run_factor_analysis(self, factor_returns):
+        self.factor_analysis = FactorAnalysis(self, factor_returns)
         
+        return None
+    
+    def get_factor_betas(self, factor = None):
+        if self.factor_analysis is None:
+            raise ValueError("Factor analysis has not been set for this universe.")
+        
+        factor_exposures = self.factor_analysis.get_factor_exposures()
+        
+        if factor is None:
+            # Return all factor betas
+            return factor_exposures
+        elif factor in factor_exposures.columns:
+            # Return betas of a specific factor
+            return factor_exposures[factor]
+        else:
+            raise ValueError(f"Factor '{factor}' not found in the factor analysis.")
+            
+        return None
+    
+    def calc_factor_ranges(self):
+        factor_betas = self.get_factor_betas()
+        min_betas = factor_betas.min()
+        max_betas = factor_betas.max()
+        return pd.DataFrame({'min': min_betas, 'max': max_betas})
+    
 class Portfolio():
     """
     Class to capture a portfolio. Contains the portfolio's name, stock universe, weights, 

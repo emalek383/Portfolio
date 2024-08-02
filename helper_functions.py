@@ -1,4 +1,15 @@
 import numpy as np
+import pandas as pd
+from datetime import datetime
+
+def convert_to_date(date):
+    if isinstance(date, pd.Timestamp):
+        date = date.to_pydatetime()
+    
+    date = datetime.date(date)
+    
+    return date
+
 
 def get_mean_returns(returns):
     """

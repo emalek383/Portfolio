@@ -1,0 +1,76 @@
+/* Streamlit class name of the div that holds the expander's title*/
+.eqpbllx1 p {
+   font-weight: 600;
+   font-size: 19px;
+   }
+
+.header {
+color: #1E90FF;
+font-size: 24px;
+font-weight: bold;
+margin-bottom: 10px;
+text-align: center;
+}
+
+table {
+    width: 100%;
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+th {
+    background-color: #f0f7ff;
+    color: black;
+    font-weight: bold;
+    width: 1%;
+    white-space: nowrap;
+}
+td {
+    width: auto;
+}
+
+.table-wrapper-75 {
+    width: 75%;
+    margin: 0 auto;
+    overflow-x: auto;
+}
+
+.table-wrapper-full {
+    width: 100%;
+    margin: 0 auto;
+    overflow-x: auto;
+}
+
+.stTabs {
+    padding-top: 30px;
+}
+
+.stTabs [data-baseweb = "tab-list"] button [data-testid = "stMarkdownContainer"] p {
+    font-weight: 600;
+    font-size: 19px;
+}
+
+.stTabs [data-baseweb = "tab"] {
+    height: 30px;
+}
+
+div[data-testid="stRadio"] > label > div[data-testid="stMarkdownContainer"] > p {
+        font-size: 16px;
+    }
+    
+div[data-testid="stNumberInput"] > label > div[data-testid="stMarkdownContainer"] > p {
+/*div > div > label {--->*/
+        font-size: 16px;
+    }
+    
+div[data-testid="stDateInput"] > label > div[data-testid="stMarkdownContainer"] > p {
+        font-size: 16px;
+    }
+    
+div[data-testid="stTextInput"] > label > div[data-testid="stMarkdownContainer"] > p {
+        font-size: 16px;
+    }
