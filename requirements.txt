@@ -4,5 +4,4 @@ yfinance==0.2.41
 cvxpy
 statsmodels
 requests
-json
 re
