@@ -30,6 +30,7 @@ logging.basicConfig(level=logging.INFO)
 def check_and_download_zip(url, zip_filename, csv_filename):
     try:
         logging.info(f"Processing {url}")
+        logging.info(f"Current working directory: {os.getcwd()}")
         
         # Extract the base name of the zip file (without extension)
         base_name = os.path.splitext(os.path.basename(zip_filename))[0]
@@ -56,14 +57,16 @@ def check_and_download_zip(url, zip_filename, csv_filename):
             if download_new:
                 logging.info(f"Downloading new file for {base_name}...")
                 response = requests.get(url)
-                with open(zip_filename, 'wb') as file:
+                full_zip_path = os.path.abspath(zip_filename)
+                with open(full_zip_path, 'wb') as file:
                     file.write(response.content)
-                logging.info(f"New file downloaded: {zip_filename}")
+                logging.info(f"New file downloaded: {full_zip_path}")
                 
                 # Unzip the file
+                full_csv_path = os.path.abspath(csv_filename)
                 with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-                    zip_ref.extractall(os.path.dirname(csv_filename))
-                logging.info(f"File extracted to: {csv_filename}")
+                    zip_ref.extractall(os.path.dirname(full_csv_path))
+                logging.info(f"File extracted to: {full_csv_path}")
                 
                 # Save the remote modification time
                 with open(info_filename, 'w') as info_file:
@@ -105,6 +108,7 @@ if st.button("Check and Download"):
             result = check_and_download_zip(url, zip_filename, csv_filename)
         if result:
             st.success("File processed successfully")
+            st.write(f"Check the log for file locations. Current directory: {os.getcdw()}")
         else:
             st.error("Failed to process file")
     else:
