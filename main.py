@@ -108,7 +108,7 @@ if st.button("Check and Download"):
             result = check_and_download_zip(url, zip_filename, csv_filename)
         if result:
             st.success("File processed successfully")
-            st.write(f"Check the log for file locations. Current directory: {os.getcdw()}")
+            st.write(f"Check the log for file locations. Current directory: {os.getcwd()}")
         else:
             st.error("Failed to process file")
     else:
