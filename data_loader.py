@@ -112,12 +112,18 @@ def load_factor_df(factor_model):
     for req in factor_reqs[factor_model]:
         factor_data = FACTOR_FILES[req]
         csv_filename = factor_data[0]
-        check_and_download_zip(factor_data[1], factor_data[2], csv_filename)
+        #check_and_download_zip(factor_data[1], factor_data[2], csv_filename)
         factor_dfs.append(load_factor_csv(csv_filename))
         
     factor_df = pd.concat(factor_dfs, axis = 1).dropna()
         
     return factor_df
+
+def check_latest():
+    for model_data in FACTOR_FILES_LIST:
+        csv_filename = model_data[0]
+        check_and_download_zip(model_data[1], model_data[2], csv_filename)
+        print("Downloaded model!")
 
 def check_and_download_zip(url, zip_filename, csv_filename):
     # Extract the base name of the zip file (without extension)

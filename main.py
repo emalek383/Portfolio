@@ -2,13 +2,20 @@ import streamlit as st
 from setup_forms import setup_stock_selection_form, setup_weights_form, setup_optimise_portfolio_form, setup_factor_analysis_form
 from setup_displays import setup_portfolio_display, setup_details_display
 from process_forms import process_stock_form
+from data_loader import check_latest
+
+st.set_page_config(layout="wide")
 
 def load_css(file_name):
     with open(file_name) as f:
         css_content = f.read()
         st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
-st.set_page_config(layout="wide")
+@st.cache_data
+def update_factor_models():
+    check_latest()
+    
+update_factor_models()
 
 load_css('styles/style.css')    
 
