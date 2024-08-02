@@ -195,7 +195,7 @@ def setup_optimise_portfolio_form(form):
         factor_ranges = get_default_factor_bounds(state.universe)
         for idx, factor in enumerate(factor_list):
             factor_bounds_values[idx] = list(factor_bounds_values[idx])
-            if factor_bounds_values[idx] == factor_ranges[factor]:
+            if factor_bounds_values[idx] == list(factor_ranges[factor]):
                 continue
             else:
                 if factor_bounds_values[idx][0] == factor_ranges[factor][0]:
