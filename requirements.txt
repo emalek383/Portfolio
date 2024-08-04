@@ -1,7 +1,6 @@
-appdirs
+plotly==5.22.0
 matplotlib
 yfinance==0.2.41
 cvxpy
 statsmodels
 requests
-plotly==4.14.3
