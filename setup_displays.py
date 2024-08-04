@@ -776,7 +776,7 @@ def plot_portfolio_comparison(factor_exposures, factor_contributions, name_map =
     ax1.set_ylabel('Factor Exposure')
     ax1.set_title('Factor Exposure Comparison Across Portfolios')
     ax1.set_xticks(x + width * (len(factors) - 1) / 2)
-    ax1.set_xticklabels(portfolio_full_names)
+    ax1.set_xticklabels(portfolio_full_names, rotation = 45, ha = 'right')
     ax1.legend(title = 'Factors', bbox_to_anchor = (1.05, 1), loc = 'upper left')
     
     bar_width = 0.4    
@@ -880,7 +880,7 @@ def plot_return_comparison(factor_exposures, factor_contributions, name_map = No
     ax.set_ylabel('Return Attribution (%)')
     ax.set_title('Percentage of Return Attributable to Factors Across Portfolios')
     ax.set_xticks(x)
-    ax.set_xticklabels(portfolio_full_names)
+    ax.set_xticklabels(portfolio_full_names, rotation = 45, ha = 'right')
     ax.legend(title = 'Factors', bbox_to_anchor = (1.05, 1), loc = 'upper left')
     ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
     
@@ -921,7 +921,7 @@ def plot_exposure_comparison(factor_exposures, name_map = None, factor_bounds = 
     ax.set_ylabel('Factor Exposure')
     ax.set_title('Factor Exposure Comparison Across Portfolios')
     ax.set_xticks(x + width * (len(factors) - 1) / 2)
-    ax.set_xticklabels(portfolio_full_names)
+    ax.set_xticklabels(portfolio_full_names, rotation = 45, ha = 'right')
     ax.legend(title = 'Factors', bbox_to_anchor = (1.05, 1), loc = 'upper left')
     
     plt.tight_layout()
