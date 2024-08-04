@@ -14,6 +14,8 @@ class FactorAnalysis():
         self.aligned_data = self._align_data()
         self.results = self._run_factor_analysis()
         
+        self.factor_cov_matrix, self.idiosyncratic_var, self.stock_cov_matrix = self._compute_factor_based_covariance()
+        
     def _align_data(self):
         start_date = pd.Timestamp(self.universe.start_date)
         end_date = pd.Timestamp(self.universe.end_date)
@@ -27,8 +29,6 @@ class FactorAnalysis():
         
         stock_returns = self.universe.stock_data.pct_change().dropna()
         aligned_data = pd.concat([stock_returns, self.factor_returns], axis=1).loc[start_date:end_date].dropna()
-        
-        #print(f"Aligned data range: {aligned_data.index[0]} to {aligned_data.index[-1]}")
         
         return aligned_data
     
@@ -107,3 +107,36 @@ class FactorAnalysis():
             'Factor Exposures': portfolio_exposures_df,
             'Alpha': portfolio_alpha
         }
+    
+    def _compute_factor_based_covariance(self):
+        """
+        Compute the covariance matrix of the stock universe using factor analysis.
+        
+        Returns:
+        - factor_cov_matrix: DataFrame, covariance matrix of factor returns
+        - idiosyncratic_var: Series, idiosyncratic variances of stocks
+        - stock_cov_matrix: DataFrame, full covariance matrix of stock returns
+        """
+        factor_exposures = self.get_factor_exposures()
+        
+        factor_returns = self.aligned_data[self.factor_returns.columns.drop('RF')] / 100
+        factor_cov_matrix = factor_returns.cov()
+        
+        # Compute idiosyncratic returns
+        stock_returns = self.aligned_data[self.universe.stocks]
+        predicted_returns = factor_exposures @ factor_returns.T
+        # Correctly broadcast RF to match the dimensions of stock_returns
+        rf_returns = self.aligned_data['RF'].values[:, np.newaxis] * np.ones_like(stock_returns)
+        
+        idiosyncratic_returns = stock_returns - predicted_returns.T - rf_returns
+        
+        idiosyncratic_var = idiosyncratic_returns.var()
+        
+        # Compute full covariance matrix
+        common_cov = factor_exposures @ factor_cov_matrix @ factor_exposures.T
+        idiosyncratic_cov = pd.DataFrame(np.diag(idiosyncratic_var), 
+                                         index=idiosyncratic_var.index, 
+                                         columns=idiosyncratic_var.index)
+        stock_cov_matrix = common_cov + idiosyncratic_cov
+        
+        return factor_cov_matrix, idiosyncratic_var, stock_cov_matrix

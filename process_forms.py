@@ -3,15 +3,23 @@ import streamlit as st
 
 from StockUniverse import StockUniverse, Portfolio
 from data_loader import load_default_stocks, load_default_bonds, load_factor_df
-from optimisers import efficient_portfolio, minimise_vol
-from helper_functions import convert_to_date
+from optimisers import minimise_vol, maximise_returns, maximise_sharpe
+from helper_functions import convert_to_date, get_default_factor_bounds, portfolio_satisfies_constraints, format_covariance_choice
+from portfolio_state_manager import clear_factor_cov_data, clear_factor_constrained_data, update_efficient_frontier, update_portfolio, get_portfolio, clear_all_portfolio_data, get_efficient_frontier
 
 state = st.session_state
+
+def update_covariance_choice(cov_type):
+    state.cov_type = cov_type
+    # Recompute the custom portfolio with given weights
+    custom_portfolio = get_portfolio('custom')
+    custom_portfolio.calc_performance(cov_type = cov_type)
+    update_portfolio('custom', custom_portfolio)
 
 def process_stock_form(stock_list = None, start_date = None, end_date = None, risk_free_rate = None):
     """
     Process the stock selection form by downloading stock data and setting up the stock universe,
-    including max SR portfolio, min vol portfolio and a custom portfolio of uniform weights.
+    including max sharpe portfolio, min vol portfolio and a custom portfolio of uniform weights.
     If stock_list, start_date or end_date are missing, will load saved stocks.
     Updates streamlit session_state automatically.
 
@@ -34,6 +42,8 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         String of error messages for user.
 
     """
+    
+    clear_all_portfolio_data()
     
     errors = ""
     
@@ -101,16 +111,21 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
     if risk_free_rate == None:
         universe.calc_risk_free_rate()
                     
-    state.eff_frontier = universe.calc_efficient_frontier()
+    eff_frontier_data, max_sharpe_portfolio = universe.calc_efficient_frontier()
     
-    portfolios = {'max_SR': universe.max_SR_portfolio, 'min_vol': universe.min_vol_portfolio}
-        
+    update_efficient_frontier(eff_frontier_data, cov_type = 'sample_cov')
+    print("\n Upated the efficient frontier")
+    print(f"Keys in state: {list(state.keys())}")
+    
+    update_portfolio('max_sharpe', universe.max_sharpe_portfolio, cov_type = 'sample_cov')
+    update_portfolio('min_vol', universe.min_vol_portfolio, cov_type = 'sample_cov')
+    
     # Custom Portfolio: initialise as uniform portflio
     custom_portfolio = Portfolio(universe, name = "Custom")
-    portfolios['custom'] = custom_portfolio
-        
+    
+    update_portfolio('custom', custom_portfolio, cov_type = 'sample_cov')
+    
     state.universe = universe
-    state.portfolios = portfolios
     state.factor_model = None
     state.factor_bounds = {}
         
@@ -119,7 +134,7 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
 def recompute_portfolio(weights):
     """
     Recompute the custom portfolio data given new weights.
-    Automatically updates portfolios in sreamlit session_state.
+    Automatically updates portfolios in streamlit session_state.
     
 
     Parameters
@@ -135,11 +150,79 @@ def recompute_portfolio(weights):
         
     universe = state.universe
     custom_portfolio = Portfolio(universe, name = "Custom", weights = weights)
-    state.portfolios['custom'] = custom_portfolio
+    update_portfolio('custom', custom_portfolio)
     
     return None
+
+
+def extract_factor_bounds(factor_list, factor_bounds_values):
+    factor_bounds = {}
+    factor_ranges = get_default_factor_bounds(state.universe)
+    print(f"Default factor ranges: {factor_ranges}")
+    for idx, factor in enumerate(factor_list):
+        factor_bounds_values[idx] = list(factor_bounds_values[idx])
+        if factor_bounds_values[idx] == list(factor_ranges[factor]):
+            continue
+        else:
+            if factor_bounds_values[idx][0] == factor_ranges[factor][0]:
+                factor_bounds_values[idx][0] = None
+            if factor_bounds_values[idx][1] == factor_ranges[factor][1]:
+                factor_bounds_values[idx][1] = None
+        
+        factor_bounds[factor] = factor_bounds_values[idx]
+        
+    return factor_bounds
+
+def impose_factor_constraints(factor_model, factor_list, factor_bounds_values):
+    print("\nStarting impose_factor_constraints")
+    factor_bounds = extract_factor_bounds(factor_list, factor_bounds_values)
+    
+    print(f"factor bounds: {factor_bounds}")
+    if factor_bounds == state.factor_bounds:
+        print("Factor bounds unchanged, returning")
+        return 
+            
+    print("Updating state.factor_bounds")
+    state.factor_bounds = factor_bounds
+    print("Clearing constrained data")
+    clear_factor_constrained_data()
+    
+    universe = state.universe
+    
+    if factor_bounds:
+        for cov_type in ['sample_cov', 'factor_cov']:
+            try:
+                min_vol_portfolio = Portfolio(universe, 'Constrained Min Vol')
+                min_vol_portfolio = minimise_vol(min_vol_portfolio, factor_bounds = factor_bounds, cov_type = cov_type)
+            
+                with st.spinner(f"Calculating constrained efficient frontier using {format_covariance_choice(cov_type)}"):
+                    constrained_eff_frontier, max_sharpe_portfolio = vol_sweep(universe, factor_bounds = factor_bounds, cov_type = cov_type)
+                    
+                update_efficient_frontier(constrained_eff_frontier, cov_type, constrained = True)
+
+                # Only save the constrained max sharpe and min vol portfolios if they are actually different (up to numerical tolerance) from unconstrained ones.
+                unconstrained_max_sharpe = get_portfolio('max_sharpe', cov_type = cov_type, constrained = False)
+                if max_sharpe_portfolio and not same_weights(unconstrained_max_sharpe.weights, max_sharpe_portfolio.weights):
+                    # Check whether the max sharpe portfolio actually also saved the constraints but was just missed
+                    if not portfolio_satisfies_constraints(unconstrained_max_sharpe, factor_bounds):
+                        update_portfolio('max_sharpe', max_sharpe_portfolio, cov_type = cov_type, constrained = True)
+                
+                unconstrained_min_vol = get_portfolio('min_vol', cov_type = cov_type, constrained = False)
+                if min_vol_portfolio and not same_weights(unconstrained_min_vol.weights, min_vol_portfolio.weights):
+                    # Check whether the min vol portfolio actually also saved the constraints but was just missed
+                    if not portfolio_satisfies_constraints(unconstrained_min_vol, factor_bounds):
+                        update_portfolio('min_vol', min_vol_portfolio, cov_type = cov_type, constrained = True)
+                    
+                st.success(f"Calculated the efficient frontier for {format_covariance_choice(cov_type)} subject to the factor constraints.")
+                    
+            except Exception:
+                st.error(f"Unable to find a minimum volatility portfolio for {format_covariance_choice(cov_type)} while obeying the constraints. This suggests that no portfolios satisfy your factor constraints.")
+            
+    else:
+        clear_ranges()
+        
  
-def optimise_custom_portfolio(optimiser, target, factor_model = None, factor_bounds = None):
+def optimise_custom_portfolio(form, optimiser, target, factor_model = None, factor_bounds = None):
     """
     Optimise the custom portfolio according to the optimiser (min_vol or max_returns).
     Automatically updates portfolios in streamlit session_state.
@@ -159,117 +242,107 @@ def optimise_custom_portfolio(optimiser, target, factor_model = None, factor_bou
     """
     
     universe = state.universe
+    cov_type = state.cov_type
     
     try:
-        custom_portfolio = universe.optimise_portfolio(optimiser, target, factor_bounds)
-        st.success("Successfully optimised your custom portfolio.")
+        custom_portfolio = universe.optimise_portfolio(optimiser, target, cov_type = cov_type, factor_bounds = factor_bounds)
+        form.success("Successfully optimised your custom portfolio.")
     except Exception:
-        st.error("Unable to optimise portfolio according to the target and am now optimising without the factor constraints.")
-        custom_portfolio = universe.optimise_portfolio(optimiser, target)
+        if state.factor_bounds:
+            form.info("Unable to optimise portfolio according to the target and am now optimising without the factor constraints.")
+            custom_portfolio = universe.optimise_portfolio(optimiser, target, cov_type = cov_type, factor_bounds = factor_bounds)
+        else:
+            form.error("Unable to optimise your portfolio.")
+            custom_portfolio = get_portfolio('custom')
         
     custom_portfolio.name = "Custom"
-    state.portfolios['custom'] = custom_portfolio
-    if factor_bounds:
-        if factor_bounds == state.factor_bounds:
-            return
-        
-        state.factor_bounds = factor_bounds
-
-        
-        clear_constrained_portfolios()
-        
-        try:
-            min_vol_portfolio = Portfolio(universe, 'Constrained Min Vol')
-            min_vol_portfolio = minimise_vol(min_vol_portfolio, factor_bounds = factor_bounds)
-            
-            state.constrained_eff_frontier, max_SR_portfolio = calculate_constrained_efficient_frontier(universe, factor_bounds)
-        
-            # Only save the constrained max SR and min vol portfolios if they are actually different (up to numerical tolerance) from unconstrained ones.
-            if max_SR_portfolio and not same_weights(state.portfolios['max_SR'].weights, max_SR_portfolio.weights):
-                state.portfolios['constrained_max_SR'] = max_SR_portfolio
-            if min_vol_portfolio and not same_weights(state.portfolios['min_vol'].weights, min_vol_portfolio.weights):
-                state.portfolios['constrained_min_vol'] = min_vol_portfolio
-                
-            st.success("Calculated the efficient frontier subject to the factor constraints.")
-                
-        except Exception:
-            st.error("Unable to find minimum volatility portfolio while obeying the constraints. This suggests that no portfolios satisfy your factor constraints. Therefore, your factor constraints have been ignored.")
-            min_vol_portfolio = None
-            state.factor_bounds = factor_bounds = {}
-            
-    else:
-        if 'constrained_max_SR' in state.portfolios:
-            del state.portfolios['constrained_max_SR']
-        if 'constrained_min_vol' in state.portfolios:
-            del state.portfolios['constrained_min_vol']
-        if 'constrained_eff_frontier' in state:
-            del state['constrained_eff_frontier']
+    update_portfolio('custom', custom_portfolio)
     
 def process_factor_analysis_form(factor_model):
-    clear_factor_analysis()
     factor_df = load_factor_df(factor_model)
     state.universe.run_factor_analysis(factor_df)
     state.factor_model = factor_model
     
+    initialise_factor_covariance_matrix()
+    
     factor_start_date, factor_end_date = state.universe.factor_analysis.get_date_range()
     date_range = factor_end_date - factor_start_date
     if factor_end_date < state.universe.end_date:
-        st.error(f"Note that the Fama-French factor data has a lag and only runs until {factor_end_date.strftime('%d/%m/%Y')}. The remaining days will not be used.")
+        st.info(f"Note that the Fama-French factor data has a lag and only runs until {factor_end_date.strftime('%d/%m/%Y')}. The remaining days will not be used.")
     if date_range.days < 230:
-        st.error(f"Note that the factor analysis only covers {date_range.days} days and may not be reliable!")
+        st.info(f"Note that the factor analysis only covers {date_range.days} days and may not be reliable!")
     
 def clear_ranges():
     state.factor_bounds = {}
-    clear_constrained_portfolios()
-    if 'constrained_eff_frontier' in state:
-        del state['constrained_eff_frontier']
-    
-def clear_constrained_portfolios():
-    if 'constrained_max_SR' in state.portfolios:
-        del state.portfolios['constrained_max_SR']
-    if 'constrained_min_vol' in state.portfolios:
-        del state.portfolios['constrained_min_vol']
+    clear_factor_constrained_data()
     
 def clear_factor_analysis():
     state.factor_model = None
     clear_ranges()
-        
-def calculate_constrained_efficient_frontier(universe, factor_bounds, constraint_set = (0, 1)):
-    LOWER = universe.min_returns
-    UPPER = universe.max_returns
     
-    target_excess_returns = np.linspace(LOWER, UPPER, 500)
-    efficient_frontier_vols = []
-    constrained_max_SR_portfolio = None
+def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set = (0, 1), initial_steps = 500, max_refinements = 5, vol_tolerance = 1e-8, max_iters = 1_000):
+    max_vol = universe.max_vol
     
-    progress_text = "Calculating efficient frontier subject to constraints."
-    my_bar = st.progress(0, text = progress_text)
-    for iteration, target in enumerate(target_excess_returns):
-        # for each efficient portfolio, obtain the portfolio volatility
-        eff_portfolio = Portfolio(universe)
-        try:
-            eff_portfolio = efficient_portfolio(eff_portfolio, target, factor_bounds)
-            efficient_frontier_vols.append(eff_portfolio.vol)
-            if not constrained_max_SR_portfolio:
-                constrained_max_SR_portfolio = eff_portfolio
-            elif eff_portfolio.sharpe_ratio > constrained_max_SR_portfolio.sharpe_ratio:
-                constrained_max_SR_portfolio = eff_portfolio
-                
-            constrained_max_SR_portfolio.name = "Constrained Max Sharpe Ratio"
-            
-        except:
-            efficient_frontier_vols.append(None)
-            
-        percent_complete = (iteration + 1) / len(target_excess_returns)
-        my_bar.progress(percent_complete, text = progress_text)
-    
-    my_bar.empty()
-    return ((efficient_frontier_vols, target_excess_returns), constrained_max_SR_portfolio)
+    UPPER_VOL = max_vol
 
-def same_weights(weights1, weights2, threshold=1e-4):
+    efficient_frontier_vols = []
+    efficient_frontier_returns = []
+    constrained_max_sharpe_portfolio = None
+    
+    current_vol = UPPER_VOL
+    previous_vol = None
+    vol_step = UPPER_VOL / initial_steps
+    
+    for refinement in range(max_refinements):
+        iteration = 0
+        while not previous_vol or abs(current_vol - previous_vol) > vol_tolerance and iteration <= max_iters:
+            eff_portfolio = Portfolio(universe)
+            try:
+                eff_portfolio = maximise_returns(eff_portfolio, current_vol, factor_bounds = factor_bounds, cov_type = cov_type)
+                efficient_frontier_vols.append(eff_portfolio.vol)
+                efficient_frontier_returns.append(eff_portfolio.excess_returns)
+            
+                if not constrained_max_sharpe_portfolio or eff_portfolio.sharpe_ratio > constrained_max_sharpe_portfolio.sharpe_ratio:
+                    constrained_max_sharpe_portfolio = eff_portfolio
+                    constrained_max_sharpe_portfolio.name = "Constrained Max Sharpe"
+                
+                previous_vol = eff_portfolio.vol
+            
+                current_vol = eff_portfolio.vol - vol_step
+  
+            except:
+                break
+            
+            iteration += 1
+        
+        vol_step /= 10
+        current_vol = previous_vol - vol_step
+  
+    efficient_frontier_returns.append(universe.min_returns)
+    efficient_frontier_vols.append(previous_vol)
+    return ((efficient_frontier_vols, efficient_frontier_returns), constrained_max_sharpe_portfolio) 
+
+def same_weights(weights1, weights2, threshold=1e-3):
     if len(weights1) != len(weights2):
         return False
     
     weights_diff = np.abs(weights1 - weights2)
     
     return np.all(weights_diff < threshold)
+
+def initialise_factor_covariance_matrix():
+    clear_factor_cov_data()
+    clear_factor_constrained_data()
+    
+    with st.spinner("Calculating efficient frontier with factor covariance matrix..."):
+        factor_eff_frontier, factor_cov_max_sharpe = state.universe.calc_efficient_frontier(cov_type = 'factor_cov')
+        update_efficient_frontier(factor_eff_frontier, 'factor_cov', constrained = False)
+        
+    portfolio = Portfolio(state.universe)
+    factor_cov_max_sharpe.name = 'Max Sharpe'
+    update_portfolio('max_sharpe', factor_cov_max_sharpe, cov_type = 'factor_cov')
+
+    portfolio = Portfolio(state.universe)
+    factor_cov_min_vol = minimise_vol(portfolio, cov_type = 'factor_cov')
+    factor_cov_min_vol.name = 'Min Vol'
+    update_portfolio('min_vol', factor_cov_min_vol, cov_type = 'factor_cov')

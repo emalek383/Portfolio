@@ -2,6 +2,24 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
+COV_METHODS = [
+    {
+     'id': 'sample_cov',
+     'name': 'Sample Covariance',
+     'description': 'Estimate covariance using historical returns'
+     },
+    {
+     'id': 'factor_cov',
+     'name': 'Factor-based Covariance',
+     'description': 'Estimate covariance using factor model'
+     }
+    ]
+
+COV_METHOD_MAP = {method['id']: method for method in COV_METHODS}
+
+def format_covariance_choice(cov_type):
+    return COV_METHOD_MAP[cov_type]['name']
+
 def convert_to_date(date):
     if isinstance(date, pd.Timestamp):
         date = date.to_pydatetime()
@@ -9,6 +27,33 @@ def convert_to_date(date):
     date = datetime.date(date)
     
     return date
+
+def get_default_factor_bounds(universe):
+    ranges = universe.calc_factor_ranges()
+    default_bounds = {}
+    for factor in ranges.index:
+        min_val = ranges.loc[factor, 'min']
+        max_val = ranges.loc[factor, 'max']
+        range_width = max_val - min_val
+        default_bounds[factor] = [min_val - 0.1*range_width, max_val + 0.1*range_width]
+        
+    return default_bounds
+
+
+def portfolio_satisfies_constraints(portfolio, factor_bounds):
+    for factor, (lower, upper) in factor_bounds.items():
+        factor_betas = portfolio.universe.get_factor_betas(factor).values
+        weights = portfolio.weights
+        if lower and factor_betas @ weights < lower:
+            return False
+        if upper and factor_betas @ weights > upper:
+            return False
+        
+    return True
+
+def format_factor_choice(option):
+    format_map = {'ff3': 'Fama-French 3-Factor', 'ff4': 'Fama-French 3-Factor + Momentum', 'ff5': 'Fama-French 5-Factor', 'ff6': 'Fama-French 5-Factor + Momentum'}
+    return format_map[option]
 
 
 def get_mean_returns(returns):

@@ -3,7 +3,13 @@ import cvxpy as cp
 
 TRADING_DAYS = 252
 
-def maximise_SR(portfolio, constraint_set = (0, 1)):
+def update_portfolio(portfolio, weights, cov_type):
+    portfolio.weights = clean_weights(weights.value)
+    portfolio.calc_performance(cov_type)
+    
+    return portfolio
+
+def maximise_sharpe(portfolio, cov_type = 'sample_cov', constraint_set = (0, 1)):
     """
     Maximise Sharpe Ratio by altering the weights of passed portfolio.
     
@@ -26,7 +32,8 @@ def maximise_SR(portfolio, constraint_set = (0, 1)):
     weights = cp.Variable(num_assets)
     
     mean_returns = portfolio.universe.mean_returns.values * TRADING_DAYS
-    cov_matrix = portfolio.universe.cov_matrix.values * TRADING_DAYS
+    cov_matrix = portfolio.universe.get_covariance_matrix(cov_type) * TRADING_DAYS
+    #cov_matrix = portfolio.universe.cov_matrix.values * TRADING_DAYS
     
     portfolio_returns = mean_returns @ weights #- portfolio.universe.risk_free_rate
     portfolio_var = cp.quad_form(weights, cov_matrix)
@@ -49,12 +56,11 @@ def maximise_SR(portfolio, constraint_set = (0, 1)):
         raise ValueError(f"Sharpe Ratio Maximisation did not converge. Status {problem.status}")
         
     optimal_weights = weights.value / np.sum(weights.value)
-    portfolio.weights = clean_weights(optimal_weights)
-    portfolio.calc_performance()
+    portfolio = update_portfolio(portfolio, weights, cov_type)
     
     return portfolio
 
-def minimise_vol(portfolio, factor_bounds = None, constraint_set = (0, 1)):
+def minimise_vol(portfolio, cov_type = 'sample_cov', factor_bounds = None, constraint_set = (0, 1)):
     """
     Minimise the portfolio variance by altering the weights in passed portfolio.
 
@@ -76,7 +82,7 @@ def minimise_vol(portfolio, factor_bounds = None, constraint_set = (0, 1)):
     
     weights = cp.Variable(num_assets)
     
-    cov_matrix = portfolio.universe.cov_matrix.values * TRADING_DAYS
+    cov_matrix = portfolio.universe.get_covariance_matrix(cov_type) * TRADING_DAYS
     
     objective = cp.Minimize(cp.quad_form(weights, cov_matrix))
     
@@ -99,18 +105,22 @@ def minimise_vol(portfolio, factor_bounds = None, constraint_set = (0, 1)):
     try:
         problem.solve()
     except cp.error.SolverError:
-        print(f"Got an error at the level of minimise_vol(). Error {cp.error.SolverError}")
         raise ValueError("Volatility minimisation problem could not be solved.")
         
-    if problem.status != cp.OPTIMAL:
-        raise ValueError(f"Volatility minimisation did not converge. Status: {problem.status}")
-        
-    portfolio.weights = clean_weights(weights.value)
-    portfolio.calc_performance()
+    if problem.status == cp.OPTIMAL_INACCURATE:
+        raise ValueError("Volatility minimisation may be inaccurate.")
+        #print("Optimisation may be inaccurate.")
+    elif problem.status != cp.OPTIMAL:
+        raise ValueError(f"Volatility minimisation problem did not converge. Status: {problem.status}")
+    
+    if weights.value is None:
+        raise ValueError("Volatility minimisation resulted in None weights.")
+    
+    portfolio = update_portfolio(portfolio, weights, cov_type)
     
     return portfolio
         
-def efficient_portfolio(portfolio, excess_returns_target, factor_bounds=None, constraint_set=(0, 1)):
+def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov', factor_bounds=None, constraint_set=(0, 1), verbose = False):
     """
     For a fixed return target, optimise the portfolio for min volatility using CVXPY.
     Parameters
@@ -137,7 +147,7 @@ def efficient_portfolio(portfolio, excess_returns_target, factor_bounds=None, co
 
     # Access mean returns and covariance matrix
     mean_returns = portfolio.universe.mean_returns.values * TRADING_DAYS
-    cov_matrix = portfolio.universe.cov_matrix.values * np.sqrt(TRADING_DAYS)
+    cov_matrix = portfolio.universe.get_covariance_matrix(cov_type) * TRADING_DAYS
 
     # Define objective function (minimize volatility)
     objective = cp.Minimize(cp.quad_form(weights, cov_matrix))
@@ -163,20 +173,26 @@ def efficient_portfolio(portfolio, excess_returns_target, factor_bounds=None, co
     problem = cp.Problem(objective, constraints)
     try:
         problem.solve(warm_start = True, verbose = False)
-        if problem.status != cp.OPTIMAL:
-            raise ValueError(f"Optimization did not converge. Status: {problem.status}")
-    #except cp.error.SolverError:
-    except Exception as e:
-        print(f"Optimisation failed: {e}")
-    #raise ValueError("Optimization problem could not be solved. It may be infeasible.")
+        if verbose:
+            print(problem.status)
+    except cp.error.SolverError:
+        raise ValueError("Optimisation problem could not be solved.")
+        
+    if problem.status == cp.OPTIMAL_INACCURATE:
+        raise ValueError("Optimisation may be inaccurate.")
+        #print("Optimisation may be inaccurate.")
+    elif problem.status != cp.OPTIMAL:
+        raise ValueError(f"Optimisation did not converge. Status: {problem.status}")
+    
+    if weights.value is None:
+        raise ValueError("Optimisation resulted in None weights.")
 
     # Update portfolio weights and recalculate performance
-    portfolio.weights = clean_weights(weights.value)
-    portfolio.calc_performance()
-
+    portfolio = update_portfolio(portfolio, weights, cov_type)
+    
     return portfolio
 
-def maximise_returns(portfolio, vol_target, factor_bounds=None, constraint_set=(0, 1)):
+def maximise_returns(portfolio, vol_target, cov_type = 'sample_cov', factor_bounds = None, constraint_set=(0, 1), tolerance = 1e-3, verbose = False):
     """
     For a fixed volatility target, optimise the portfolio for max returns using CVXPY.
     Parameters
@@ -203,7 +219,7 @@ def maximise_returns(portfolio, vol_target, factor_bounds=None, constraint_set=(
 
     # Access mean returns and covariance matrix
     mean_returns = portfolio.universe.mean_returns.values * TRADING_DAYS
-    cov_matrix = portfolio.universe.cov_matrix.values * TRADING_DAYS
+    cov_matrix = portfolio.universe.get_covariance_matrix(cov_type) * TRADING_DAYS
 
     # Define objective function (maximize excess returns)
     objective = cp.Maximize(mean_returns @ weights - portfolio.universe.risk_free_rate)
@@ -213,7 +229,8 @@ def maximise_returns(portfolio, vol_target, factor_bounds=None, constraint_set=(
         cp.sum(weights) == 1,  # Weights sum to 1
         weights >= constraint_set[0],  # Lower bound on weights
         weights <= constraint_set[1],  # Upper bound on weights
-        cp.quad_form(weights, cov_matrix) <= vol_target**2  # Volatility constraint
+        cp.quad_form(weights, cov_matrix) <= vol_target**2,  # Volatility constraint
+        #cp.quad_form(weights, cov_matrix) >= (vol_target - tolerance)**2
     ]
 
     # Add factor constraints if provided
@@ -232,16 +249,22 @@ def maximise_returns(portfolio, vol_target, factor_bounds=None, constraint_set=(
     problem = cp.Problem(objective, constraints)
     try:
         problem.solve(warm_start = True, verbose = False)
-        if problem.status != cp.OPTIMAL:
-            raise ValueError(f"Optimization did not converge. Status: {problem.status}")
-    #except cp.error.SolverError:
-    except Exception as e:
-        print(f"Optimisation failed: {e}")
-    #raise ValueError("Optimization problem could not be solved. It may be infeasible.")
+        if verbose:
+            print(problem.status)
+    except cp.error.SolverError:
+        raise ValueError("Return maximisation problem could not be solved.")
+        
+    if problem.status == cp.OPTIMAL_INACCURATE:
+        raise ValueError("Return maximisation may be inaccurate.")
+        #print("Optimisation may be inaccurate.")
+    elif problem.status != cp.OPTIMAL:
+        raise ValueError(f"Return maximisation did not converge. Status: {problem.status}")
+    
+    if weights.value is None:
+        raise ValueError("Return maximisation resulted in None weights.")
 
     # Update portfolio weights and recalculate performance
-    portfolio.weights = clean_weights(weights.value)
-    portfolio.calc_performance()
+    portfolio = update_portfolio(portfolio, weights, cov_type)
 
     return portfolio
 

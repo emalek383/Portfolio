@@ -3,7 +3,7 @@ import pandas as pd
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 from helper_functions import get_mean_returns, convert_to_date
-from optimisers import maximise_SR, minimise_vol, efficient_portfolio, maximise_returns
+from optimisers import maximise_sharpe, minimise_vol, efficient_portfolio, maximise_returns
 from data_loader import download_data
 from FactorAnalysis import FactorAnalysis
 
@@ -32,7 +32,7 @@ class StockUniverse():
         Covariance matrix
     risk_free_rate : float
         Risk free rate
-    max_SR_portfolio : Portfolio
+    max_sharpe_portfolio : Portfolio
         Max Sharpe Ratio Portfolio
     min_vol_portfolio : Portfolio
         Min Vol Portfolio
@@ -62,7 +62,7 @@ class StockUniverse():
     
     calc_mean_returns_cov():
         Calculates the mean returns and covariance matrix from stock data.
-        Updates mean_returns and cov_matrix, risk-free-rate, calculates max SR portfolio, 
+        Updates mean_returns and cov_matrix, risk-free-rate, calculates max sharpe portfolio, 
         min vol portfolio and updates min/max returns/vol.
     
     calc_risk_free_rate():
@@ -72,7 +72,7 @@ class StockUniverse():
         Calculates the annualised excess returns and volatility of the individual stocks in the universe.
         Returns vol and excess returns.
     
-    calc_max_SR_portfolio():
+    calc_max_sharpe_portfolio():
         Calculates the maximum Sharpe Ratio portfolio. Updates attributes directly. Returns None.
         
     calc_min_vol_portfolio():
@@ -127,11 +127,11 @@ class StockUniverse():
         self.factor_analysis = None
         if self.mean_returns and self.cov_matrix:
             self.update_min_max()
-            self.max_SR_portfolio = self.calc_max_SR_portfolio()
+            self.max_sharpe_portfolio = self.calc_max_sharpe_portfolio()
             self.min_vol_portfolio = self.calc_min_vol_portfolio()
         else:
             self.min_returns = self.max_returns = self.min_vol = self.max_vol = None
-            self.max_SR = self.min_vol = 0
+            self.max_sharpe = self.min_vol = 0
         
     def update_min_max(self):
         """
@@ -153,7 +153,7 @@ class StockUniverse():
         self.min_vol = self.min_vol_portfolio.vol
         self.max_vol = max(self.individual_stock_portfolios()[0])
     
-    def optimise_portfolio(self, optimiser, target, factor_bounds = None):
+    def optimise_portfolio(self, optimiser, target, cov_type = 'sample_cov', factor_bounds = None):
         """
         Finds the best weights in a portfolio in order to reach the target vol or excess returns,
         as specified by optimiser.
@@ -177,15 +177,16 @@ class StockUniverse():
         
         if optimiser == 'min_vol':
             try:
-                optimised_portfolio = efficient_portfolio(optimised_portfolio, target, factor_bounds)
+                optimised_portfolio = efficient_portfolio(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
             except Exception as e:
-                print(f"Got an error at the level of StockUniverse.optimise_portfolio(). Error {str(e)}")
                 raise ValueError(str(e))
+                print(f"Portfolio optimisation problem: {str(e)}")
         else:
             try:
-                optimised_portfolio = maximise_returns(optimised_portfolio, target, factor_bounds)
+                optimised_portfolio = maximise_returns(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
             except Exception as e:
                 raise ValueError(str(e))
+                print(f"Portfolio optimisation problem: {str(e)}")
             
         return optimised_portfolio
     
@@ -248,8 +249,8 @@ class StockUniverse():
         if not self.risk_free_rate:
             self.calc_risk_free_rate()
         
-        self.calc_max_SR_portfolio()
-        self.calc_min_vol_portfolio()
+        self.max_sharpe_portfolio = self.calc_max_sharpe_portfolio()
+        self.min_vol_portfolio = self.calc_min_vol_portfolio()
         self.update_min_max()
                 
     def calc_risk_free_rate(self):
@@ -266,8 +267,14 @@ class StockUniverse():
             
         R_F_annual = self.bonds_data/100
         self.risk_free_rate = get_mean_returns(R_F_annual)
+        
+    def get_covariance_matrix(self, cov_type = 'sample_cov'):
+        if cov_type == 'factor_cov' and self.factor_analysis is not None:
+            return self.factor_analysis.stock_cov_matrix
+        else:
+            return self.cov_matrix
             
-    def individual_stock_portfolios(self):
+    def individual_stock_portfolios(self, cov_type = 'sample_cov'):
         """
         Calculate the annualised excess returns and volatility of individual stocks in the stock portfolio.
         
@@ -282,12 +289,13 @@ class StockUniverse():
         
         vols = []
         excess_returns = []
+        cov_matrix = self.get_covariance_matrix(cov_type)
         for idx, stock in enumerate(self.stocks):
             excess_returns.append( TRADING_DAYS * (self.mean_returns.iloc[idx]) - self.risk_free_rate )
-            vols.append( np.sqrt( TRADING_DAYS * self.cov_matrix[stock][stock]) )
+            vols.append( np.sqrt( TRADING_DAYS * cov_matrix[stock][stock]) )
         return vols, excess_returns
     
-    def calc_max_SR_portfolio(self):
+    def calc_max_sharpe_portfolio(self):
         """
         Calculate the max Sharpe Ratio portfolio, and update the relevant attribute.
 
@@ -297,9 +305,9 @@ class StockUniverse():
 
         """
         
-        max_SR_portfolio = Portfolio(self, name = "Max Sharpe Ratio")
-        max_SR_portfolio = maximise_SR(max_SR_portfolio)
-        self.max_SR_portfolio = max_SR_portfolio
+        max_sharpe_portfolio = Portfolio(self, name = "Max Sharpe")
+        max_sharpe_portfolio = maximise_sharpe(max_sharpe_portfolio)
+        return max_sharpe_portfolio
         
     def calc_min_vol_portfolio(self):
         """
@@ -313,9 +321,9 @@ class StockUniverse():
         
         min_vol_portfolio = Portfolio(self, name = "Min Vol")
         min_vol_portfolio = minimise_vol(min_vol_portfolio)
-        self.min_vol_portfolio = min_vol_portfolio
+        return min_vol_portfolio
     
-    def calc_efficient_frontier(self, constraint_set = (0, 1)):
+    def calc_efficient_frontier(self, cov_type = 'sample_cov', constraint_set = (0, 1)):
         """
         Calculate the portfolios along the efficient frontier for various values of target excess return.
 
@@ -336,21 +344,26 @@ class StockUniverse():
         LOWER = self.min_returns
         UPPER = self.max_returns
         
+        cur_max_sharpe_portfolio = self.max_sharpe_portfolio
+        
         target_excess_returns = np.linspace(LOWER, UPPER, 500)
         efficient_frontier_vols = []
         for target in target_excess_returns:
             # for each efficient portfolio, obtain the portfolio volatility
             eff_portfolio = Portfolio(self)
             try:
-                eff_portfolio = efficient_portfolio(eff_portfolio, target,)
+                eff_portfolio = efficient_portfolio(eff_portfolio, target, cov_type = cov_type)
                 efficient_frontier_vols.append(eff_portfolio.vol)
-                if self.max_SR_portfolio and self.max_SR_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
-                    self.max_SR_portfolio = eff_portfolio
-                    self.max_SR_portfolio.name = 'Max Sharpe Ratio'
+                if cur_max_sharpe_portfolio and cur_max_sharpe_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
+                     cur_max_sharpe_portfolio = eff_portfolio
+                     cur_max_sharpe_portfolio.name = 'Max Sharpe Ratio'
             except:
                 efficient_frontier_vols.append(None)
+                
+        if cov_type == 'sample_cov':
+            self.max_sharpe_portfolio = cur_max_sharpe_portfolio
         
-        return efficient_frontier_vols, target_excess_returns
+        return (efficient_frontier_vols, target_excess_returns), cur_max_sharpe_portfolio
             
     def run_factor_analysis(self, factor_returns):
         self.factor_analysis = FactorAnalysis(self, factor_returns)
@@ -466,7 +479,7 @@ class Portfolio():
         
         self.weights = self.weights / self.weights.sum()
     
-    def calc_performance(self):
+    def calc_performance(self, cov_type = 'sample_cov'):
         """
         Compute portfolio performance: annualised return, excess return, volatility and Sharpe Ratio.
 
@@ -483,9 +496,10 @@ class Portfolio():
 
         """
         
-        if self.universe.mean_returns is not None and self.universe.cov_matrix is not None:
+        if self.universe.mean_returns is not None:
+            cov_matrix = self.universe.get_covariance_matrix(cov_type)
             self.returns = np.dot(self.weights, self.universe.mean_returns) * TRADING_DAYS
-            self.vol = np.sqrt( np.dot(np.dot(self.weights.T, self.universe.cov_matrix), self.weights) * TRADING_DAYS )
+            self.vol = np.sqrt( np.dot(np.dot(self.weights.T, cov_matrix), self.weights) * TRADING_DAYS )
             self.excess_returns = self.returns - self.universe.risk_free_rate
             self.sharpe_ratio = self.excess_returns / self.vol
         
@@ -538,3 +552,6 @@ class Portfolio():
         format_map = {col: "{:,.0%}".format for col in weights_df.columns}
         
         return weights_df, format_map
+    
+    def is_equally_weighted(self, tolerance = 1e-4):
+        return np.allclose(self.weights, self.weights[0], rtol = 0, atol = tolerance)
