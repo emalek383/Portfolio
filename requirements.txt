@@ -5,5 +5,3 @@ cvxpy
 statsmodels
 requests
 plotly==4.14.3
-datetime
-dateutil
