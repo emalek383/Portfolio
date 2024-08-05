@@ -6,3 +6,4 @@ statsmodels
 requests
 streamlit_javascript
 pyyaml
+user_agents
