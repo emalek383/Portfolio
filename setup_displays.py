@@ -35,6 +35,16 @@ def format_performance_df_for_mobile(df, format_map):
     
     return mobile_df, mobile_format_map
 
+def format_weights_df_for_mobile(df, format_map):
+    mobile_df = df.copy()
+    
+    mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
+    mobile_df.index = mobile_df.index.str.replace('Constrained', 'Constr.')
+    
+    mobile_format_map = format_map
+    
+    return mobile_df, mobile_format_map
+
 def setup_dashboard(display):
     display.header("Overview")
     if not state.universe or len(state.universe.stocks) < 2:
@@ -818,8 +828,11 @@ def display_weights_table(output, portfolios):
         joined_weights.append(weights_df)
         
     joined_weights_df = pd.concat(joined_weights, axis = 0)
+    
+    if is_mobile():
+        joined_weights_df, format_map = format_weights_df_for_mobile(joined_weights_df, format_map)
         
-    html_table = style_table(joined_weights_df, format_map)
+    html_table = style_table(joined_weights_df, format_map, is_mobile())
     wrapped_table_100 = f"<div class = 'table-wrapper-full'>{html_table}</div>"
     output.markdown(wrapped_table_100, unsafe_allow_html = True)
     
