@@ -110,8 +110,9 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
     universe.calc_mean_returns_cov()
     if risk_free_rate == None:
         universe.calc_risk_free_rate()
-                    
-    eff_frontier_data, max_sharpe_portfolio = universe.calc_efficient_frontier()
+             
+    with st.spinner("Calculating efficient frontier..."):
+        eff_frontier_data, max_sharpe_portfolio = universe.calc_efficient_frontier()
     
     update_efficient_frontier(eff_frontier_data, cov_type = 'sample_cov')
     print("\n Upated the efficient frontier")
