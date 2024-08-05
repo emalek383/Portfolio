@@ -734,6 +734,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
     names_fontsize = 20 if is_mobile() else 12
     pct_fontsize = 18 if is_mobile() else 12
     others_fontsize = 18 if is_mobile() else 12
+    group_format = f"Others (<{group_threshold * 100:.0f}%)" if is_mobile() else f"Others (<{group_threshold * 100:.1f}%)"
 
     for idx, (_, portfolio) in enumerate(portfolios):
         weights = np.array(portfolio.weights)
@@ -751,7 +752,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
             #weights = [w for i, w in enumerate(weights) if i not in small_indices]
             #stocks = [s for i, s in enumerate(stocks) if i not in small_indices]
             weights.append(small_sum)
-            stocks.append(f"Others (<{group_threshold * 100:.1f}%)")
+            stocks.append(group_format)
         
         # Sort weights and stocks
         sorted_indices = np.argsort(weights)[::-1]
@@ -778,10 +779,10 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
             else:
                 autotext.set_visible(False)
             
-            if stocks[i] not in legend_labels and stocks[i] != f"Others (<{group_threshold * 100:.1f}%)":
+            if stocks[i] not in legend_labels and stocks[i] != group_format:
                 legend_elements.append(wedge)
                 legend_labels.append(stocks[i])
-            elif stocks[i] == f"Others (<{group_threshold * 100:.1f}%)" and others_element is None:
+            elif stocks[i] == group_format and others_element is None:
                 others_element = wedge
                 others_label = stocks[i]
         
