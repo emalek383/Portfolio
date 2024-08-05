@@ -1,7 +1,7 @@
 /* Streamlit class name of the div that holds the expander's title*/
 .eqpbllx1 p {
-   font-weight: 600;
-   font-size: 19px;
+   font-weight: 400;
+   font-size: 16px;
    }
 
 .header {
@@ -50,8 +50,8 @@ td {
 }
 
 .stTabs [data-baseweb = "tab-list"] button [data-testid = "stMarkdownContainer"] p {
-    font-weight: 600;
-    font-size: 19px;
+    font-weight: 400;
+    font-size: 17px;
 }
 
 .stTabs [data-baseweb = "tab"] {
@@ -74,3 +74,28 @@ div[data-testid="stDateInput"] > label > div[data-testid="stMarkdownContainer"] 
 div[data-testid="stTextInput"] > label > div[data-testid="stMarkdownContainer"] > p {
         font-size: 16px;
     }
+    
+@media screen and (max-width: 768px) {
+    .styled-table {
+        font-size: 12px; /* Smaller font size for mobile */
+    }
+
+    .styled-table th,
+    .styled-table td {
+        padding: 6px 8px; /* Reduced padding for mobile */
+    }
+
+    .styled-table th {
+        font-weight: 600; /* Slightly less bold headers for mobile */
+    }
+
+    .styled-table td {
+        font-weight: 400; /* Normal weight for table data on mobile */
+    }
+
+    /* Adjust the table wrapper for full width on mobile */
+    .table-wrapper-full {
+        width: 100%;
+        overflow-x: auto;
+    }
+}

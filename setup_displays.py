@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import streamlit as st
 import streamlit.components.v1 as components
-# from streamlit_dimensions import st_dimensions
 from process_forms import process_stock_form
 from helper_functions import get_mean_returns, format_factor_choice, format_covariance_choice
 from portfolio_state_manager import iterate_portfolios, get_portfolio, get_efficient_frontier
@@ -18,31 +17,30 @@ state = st.session_state
 def is_mobile():
     return not state.is_session_pc
 
-# def inject_screen_detector():
-#     st.markdown("""
-#     <script>
-#     const sendScreenInfo = () => {
-#         const width = window.innerWidth;
-#         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-#         window.parent.postMessage({
-#             type: 'streamlit:setScreenInfo',
-#             width: width,
-#             isMobile: isMobile
-#         }, '*');
-#     };
-#     sendScreenInfo();
-#     window.addEventListener('resize', sendScreenInfo);
-#     </script>
-#     """, unsafe_allow_html=True)
+def format_performance_df_for_mobile(df, format_map):
+    mobile_df = df.copy()
     
-# def get_screen_info():
-#     if 'screen_info' not in state:
-#         state.screen_info = {'width': None, 'isMobile': False}
-#     return state.screen_info
-
-# def is_narrow_screen():
-#     screen_info = get_screen_info()
-#     return screen_info['width'] is not None and screen_info['width'] < 768 or screen_info['isMobile']
+    column_map = {
+        'Excess Returns': 'Ex. Returns',
+        'Volatility': 'Vol',
+        'Sharpe Ratio': 'Sharpe'
+        }
+    mobile_df.rename(columns = column_map, inplace = True)
+    
+    # mobile_df['Portfolio'] = mobile_df.index.str.replace(' Portfolio', '')
+    # mobile_df.set_index('Portfolio', inplace=True)
+    
+    mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
+    #mobile_df.set_index('Portfolio', inplace = True)
+    #mobile_df.index = mobile_df.index.astype(str)
+    #mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
+    # mobile_df.insert(0, 'Portfolio', mobile_df.index)
+    #mobile_df.index = range(len(mobile_df))
+    
+    mobile_format_map = {column_map.get(k, k): v for k, v in format_map.items()}
+    #mobile_format_map['Portfolio'] = str
+    
+    return mobile_df, mobile_format_map
 
 def setup_dashboard(display):
     display.header("Overview")
@@ -591,6 +589,10 @@ def display_portfolio_performances(output, portfolios):
         joined_perf.append(perf_df)
         
     joined_perf_df = pd.concat(joined_perf, axis = 0)
+    
+    if is_mobile():
+        joined_perf_df, format_map = format_performance_df_for_mobile(joined_perf_df, format_map)
+    
     html_table = style_table(joined_perf_df, format_map)
     wrapped_table = f'<div class="table-wrapper-75">{html_table}</div>'
     output.markdown(wrapped_table, unsafe_allow_html = True)
@@ -735,6 +737,9 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
     legend_labels = []
     others_element = None
     others_label = None
+    
+    names_fontsize = 20 if is_mobile() else 12
+    others_fontsize = 18 if is_mobile() else 12
 
     for idx, (_, portfolio) in enumerate(portfolios):
         weights = np.array(portfolio.weights)
@@ -765,7 +770,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
                                                  colors = portfolio_colors,
                                                  autopct = lambda pct: f'{pct:.1f}%' if pct > label_threshold * 100 else '',
                                                  pctdistance=0.75,
-                                                 textprops={'fontsize': 12}
+                                                 textprops={'fontsize': others_fontsize}
                                                  )
         for i, (wedge, autotext) in enumerate(zip(wedges, autotexts)):
             if weights[i] >= label_threshold:
@@ -780,7 +785,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
                 others_element = wedge
                 others_label = stocks[i]
         
-        axes[idx].set_title(portfolio.name + ' Portfolio', fontsize = 12)
+        axes[idx].set_title(portfolio.name + ' Portfolio', fontsize = names_fontsize)
         
     # Add "Others" to the end of the legend if it exists
     if others_element is not None:
@@ -789,8 +794,8 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
         
     num_cols = max(1, len(legend_labels) // 10)  # Adjust 10 to change the number of items per column
     fig.legend(legend_elements, legend_labels, loc = 'center left', 
-               bbox_to_anchor=(1, 0.5), title="Stocks", fontsize=12,
-               title_fontsize = 12, ncol=num_cols, columnspacing=1,
+               bbox_to_anchor=(1, 0.5), title="Stocks", fontsize=others_fontsize,
+               title_fontsize = others_fontsize, ncol=num_cols, columnspacing=1,
                handletextpad=0.5)
     
     plt.tight_layout()
@@ -872,7 +877,7 @@ def display_weights_bar_chart(output, portfolios, group_threshold):
             axes[idx].set_xticklabels(stocks)
 
     plt.tight_layout()
-    output.pyplot(fig, use_container_width = False)
+    output.pyplot(fig, use_container_width = True)
 
 def calculate_factor_contributions(portfolio, factor_exposures):
     factor_returns = portfolio.universe.factor_analysis.factor_returns / 100
@@ -1086,7 +1091,7 @@ def display_return_comparison(output, portfolios, factor_bounds = None):
     fig = plot_return_comparison(exposures, contributions, name_map, factor_bounds)
     
     col1, col2, col3 = output.columns([0.05, 0.8, 0.15])
-    col2.pyplot(fig, use_container_width = False)
+    col2.pyplot(fig, use_container_width = True)
     return
 
 def display_exposure_comparison(output, portfolios, factor_bounds = None):
@@ -1097,7 +1102,7 @@ def display_exposure_comparison(output, portfolios, factor_bounds = None):
     fig = plot_exposure_comparison(exposures, name_map, factor_bounds)
     
     col1, col2, col3 = output.columns([0.05, 0.8, 0.15])
-    col2.pyplot(fig, use_container_width = False)
+    col2.pyplot(fig, use_container_width = True)
 
 def display_portfolio_comparison(output, portfolios, factor_bounds = None):
     name_map = {name: portfolio.name for name, portfolio in portfolios}
@@ -1116,7 +1121,17 @@ def style_table(df, format_map = None):
     if format_map:
         styled = styled.format(format_map)
         
-    return styled.set_table_attributes("class = 'styled-table'").to_html(index = True)
+    styled = styled.format_index(None)
+
+    html_table = styled.to_html(index = False)
+
+    print(html_table)
+    html_table = html_table.replace('<th class="blank level0" >&nbsp;', '<th>Portfolio')
+    print(html_table)
+    
+    html_table = f'<div class="styled-table">{html_table}</div>'
+    
+    return html_table
 
 def sort_portfolios(portfolios):
     desired_order = ['max_SR', 'constrained_max_SR', 'min_vol', 'constrained_min_vol', 'custom']

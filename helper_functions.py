@@ -17,6 +17,7 @@ COV_METHODS = [
 
 COV_METHOD_MAP = {method['id']: method for method in COV_METHODS}
 
+
 def format_covariance_choice(cov_type):
     return COV_METHOD_MAP[cov_type]['name']
 
