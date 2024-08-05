@@ -7,3 +7,4 @@ requests
 streamlit_javascript
 pyyaml
 user_agents
+ua_parser
