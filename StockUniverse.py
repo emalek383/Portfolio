@@ -356,7 +356,7 @@ class StockUniverse():
                 efficient_frontier_vols.append(eff_portfolio.vol)
                 if cur_max_sharpe_portfolio and cur_max_sharpe_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
                      cur_max_sharpe_portfolio = eff_portfolio
-                     cur_max_sharpe_portfolio.name = 'Max Sharpe Ratio'
+                     cur_max_sharpe_portfolio.name = 'Max Sharpe'
             except:
                 efficient_frontier_vols.append(None)
                 
@@ -528,7 +528,7 @@ class Portfolio():
                    'Volatility': self.vol,
                    'Sharpe Ratio': self.sharpe_ratio,}
         
-        results_df = pd.DataFrame(results, index=[self.name + ' Porfolio'])
+        results_df = pd.DataFrame(results, index=[self.name + ' Portfolio'])
         format_map = {'Excess Returns': '{:,.1%}'.format, 'Volatility': '{:,.1%}'.format, 'Sharpe Ratio': '{:,.2f}'}
         
         return results_df, format_map
