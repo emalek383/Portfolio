@@ -1001,6 +1001,37 @@ def plot_portfolio_comparison(factor_exposures, factor_contributions, name_map =
     plt.tight_layout()
     return fig
 
+def add_smart_label(ax, rect, value, bottom, is_residual = False, cutoff = 9):
+    height = rect[0].get_height()
+    if abs(height) < cutoff:
+        return
+
+    x = rect[0].get_x() + rect[0].get_width() / 2
+    if value >= 0:
+        if is_residual:
+            y = bottom + height / 2
+        else:
+            y = bottom - height / 2
+    else:
+        if is_residual:
+            y = bottom - height / 2
+        else:
+            y = bottom + height/2
+    label = f"{value:.1f}%"
+    
+    ax.text(x, y, label, ha='center', va='center', fontsize=8)
+    
+    # # Check if the bar is too small
+    # if abs(height) < 10:  # You can adjust this threshold
+    #     if value >= 0:
+    #         y = bottom + height + 0.2  # Place the label above the bar
+    #         va = 'bottom'
+    #     else:
+    #         y = bottom + height - 0.2  # Place the label below the bar
+    #         va = 'top'
+    # else:
+    #     va = 'center'
+
 def plot_return_comparison(factor_exposures, factor_contributions, name_map = None, factor_bounds = None):
     fig, ax = plt.subplots(figsize = (10, 5))
     
@@ -1015,9 +1046,11 @@ def plot_return_comparison(factor_exposures, factor_contributions, name_map = No
     
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     color_map = {factor: default_colors[i % len(default_colors)] for i, factor in enumerate(factors)}
-    color_map['Residual'] = default_colors[len(factors) % len(default_colors)]
+    color_map['Residual'] = 'darkgrey'#default_colors[len(factors) % len(default_colors)]
 
     bar_width = 0.4    
+    
+    cutoff = 12 if is_mobile() else 9
     
     for i, portfolio_name in enumerate(portfolio_names):
         positive_bottom = 0
@@ -1027,31 +1060,39 @@ def plot_return_comparison(factor_exposures, factor_contributions, name_map = No
             if value >= 0:
                 rect = ax.bar(x[i], value, bar_width, bottom = positive_bottom, label = factor if i == 0 else "", color = color_map[factor])
                 positive_bottom += value
+                add_smart_label(ax, rect, value, positive_bottom, cutoff = cutoff)
+                
                 # add label
-                height = rect[0].get_height()
-                ax.text(rect[0].get_x() + rect[0].get_width()/2, positive_bottom - height/2,
-                         f"{value:.1f}%", ha = "center", va = "center", fontsize = 8)
+                # height = rect[0].get_height()
+                # ax.text(rect[0].get_x() + rect[0].get_width()/2, positive_bottom - height/2,
+                #           f"{value:.1f}%", ha = "center", va = "center", fontsize = 8)
             else:
                 rect = ax.bar(x[i], value, bar_width, bottom = negative_bottom, label = factor if i == 0 else "", color = color_map[factor])
                 # add label
-                height = rect[0].get_height()
-                ax.text(rect[0].get_x() + rect[0].get_width()/2, negative_bottom + height/2,
-                         f"{value:.1f}%", ha = "center", va = "center", fontsize = 8)
+                add_smart_label(ax, rect, value, negative_bottom, cutoff = cutoff)
+                
+                # height = rect[0].get_height()
+                # ax.text(rect[0].get_x() + rect[0].get_width()/2, negative_bottom + height/2,
+                #           f"{value:.1f}%", ha = "center", va = "center", fontsize = 8)
                 negative_bottom += value
                 
         residual = factor_contributions[portfolio_name].get('Residual', 0)
         if residual >= 0:
             rect = ax.bar(x[i], residual, bar_width, bottom = positive_bottom, label = 'Residual' if i == 0 else '', color = color_map['Residual'])
+            add_smart_label(ax, rect, residual, positive_bottom, is_residual = True, cutoff = cutoff)
+            
             # add label
-            height = rect[0].get_height()
-            ax.text(rect[0].get_x() + rect[0].get_width()/2, positive_bottom + height/2,
-                     f"{residual:.1f}%", ha = "center", va = "center", fontsize = 8)
+            # height = rect[0].get_height()
+            # ax.text(rect[0].get_x() + rect[0].get_width()/2, positive_bottom + height/2,
+            #           f"{residual:.1f}%", ha = "center", va = "center", fontsize = 8)
         else:
             rect = ax.bar(x[i], residual, bar_width, bottom = negative_bottom, label = 'Residual' if i == 0 else '', color = color_map['Residual'])
             # add label
-            height = rect[0].get_height()
-            ax.text(rect[0].get_x() + rect[0].get_width()/2, negative_bottom + height/2,
-                     f"{residual:.1f}%", ha = "center", va = "center", fontsize = 8)
+            add_smart_label(ax, rect, residual, negative_bottom, cutoff = cutoff)
+            
+            # height = rect[0].get_height()
+            # ax.text(rect[0].get_x() + rect[0].get_width()/2, negative_bottom + height/2,
+            #           f"{residual:.1f}%", ha = "center", va = "center", fontsize = 8)
         
     ax.set_ylabel('Return Attribution (%)')
     ax.set_title('Percentage of Return Attributable to Factors Across Portfolios')

@@ -120,7 +120,7 @@ def minimise_vol(portfolio, cov_type = 'sample_cov', factor_bounds = None, const
     
     return portfolio
         
-def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov', factor_bounds=None, constraint_set=(0, 1), verbose = False):
+def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov', factor_bounds=None, constraint_set=(0, 1), verbose = False, tolerance = 1e-8):
     """
     For a fixed return target, optimise the portfolio for min volatility using CVXPY.
     Parameters
@@ -157,7 +157,7 @@ def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov
         cp.sum(weights) == 1,  # Weights sum to 1
         weights >= constraint_set[0],  # Lower bound on weights
         weights <= constraint_set[1],  # Upper bound on weights
-        mean_returns @ weights - portfolio.universe.risk_free_rate >= excess_returns_target  # Target excess return
+        mean_returns @ weights - portfolio.universe.risk_free_rate == excess_returns_target  # Target excess return
     ]
 
     # Add factor constraints if provided
@@ -179,8 +179,8 @@ def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov
         raise ValueError("Optimisation problem could not be solved.")
         
     if problem.status == cp.OPTIMAL_INACCURATE:
-        raise ValueError("Optimisation may be inaccurate.")
-        #print("Optimisation may be inaccurate.")
+        #raise ValueError("Optimisation may be inaccurate.")
+        print("Optimisation may be inaccurate.")
     elif problem.status != cp.OPTIMAL:
         raise ValueError(f"Optimisation did not converge. Status: {problem.status}")
     
@@ -188,7 +188,11 @@ def efficient_portfolio(portfolio, excess_returns_target, cov_type = 'sample_cov
         raise ValueError("Optimisation resulted in None weights.")
 
     # Update portfolio weights and recalculate performance
+    #print(f"Target: {excess_returns_target}, weights: {weights.value}")
     portfolio = update_portfolio(portfolio, weights, cov_type)
+    # if abs(portfolio.excess_returns - excess_returns_target) > tolerance:
+    #     print(f"Did not actually hit target {excess_returns_target}")
+    #     #raise ValueError("Optimisation did not converge")
     
     return portfolio
 

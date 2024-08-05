@@ -348,22 +348,30 @@ class StockUniverse():
         
         target_excess_returns = np.linspace(LOWER, UPPER, 500)
         efficient_frontier_vols = []
+        efficient_frontier_returns = []
+        # prev_vol = None
         for target in target_excess_returns:
             # for each efficient portfolio, obtain the portfolio volatility
             eff_portfolio = Portfolio(self)
             try:
                 eff_portfolio = efficient_portfolio(eff_portfolio, target, cov_type = cov_type)
                 efficient_frontier_vols.append(eff_portfolio.vol)
+                efficient_frontier_returns.append(eff_portfolio.excess_returns)
+                # if prev_vol and eff_portfolio.vol == prev_vol:
+                #     print(eff_portfolio.excess_returns, eff_portfolio.vol)
+                # prev_vol = eff_portfolio.vol
                 if cur_max_sharpe_portfolio and cur_max_sharpe_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
                      cur_max_sharpe_portfolio = eff_portfolio
                      cur_max_sharpe_portfolio.name = 'Max Sharpe'
             except:
-                efficient_frontier_vols.append(None)
+                continue
+                # efficient_frontier_vols.append(None)
+                # efficient_frontier_returns.append(None)
                 
         if cov_type == 'sample_cov':
             self.max_sharpe_portfolio = cur_max_sharpe_portfolio
         
-        return (efficient_frontier_vols, target_excess_returns), cur_max_sharpe_portfolio
+        return (efficient_frontier_vols, efficient_frontier_returns), cur_max_sharpe_portfolio
             
     def run_factor_analysis(self, factor_returns):
         self.factor_analysis = FactorAnalysis(self, factor_returns)

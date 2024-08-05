@@ -3,7 +3,7 @@ import streamlit as st
 
 from StockUniverse import StockUniverse, Portfolio
 from data_loader import load_default_stocks, load_default_bonds, load_factor_df
-from optimisers import minimise_vol, maximise_returns, maximise_sharpe
+from optimisers import minimise_vol, maximise_returns, maximise_sharpe, efficient_portfolio
 from helper_functions import convert_to_date, get_default_factor_bounds, portfolio_satisfies_constraints, format_covariance_choice
 from portfolio_state_manager import clear_factor_cov_data, clear_factor_constrained_data, update_efficient_frontier, update_portfolio, get_portfolio, clear_all_portfolio_data, get_efficient_frontier
 
@@ -281,7 +281,7 @@ def clear_factor_analysis():
     state.factor_model = None
     clear_ranges()
     
-def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set = (0, 1), initial_steps = 500, max_refinements = 5, vol_tolerance = 1e-8, max_iters = 1_000):
+def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set = (0, 1), initial_steps = 500, max_refinements = 5, vol_tolerance = 1e-8, max_iters = 1_000, return_steps = 200):
     max_vol = universe.max_vol
     
     UPPER_VOL = max_vol
@@ -310,6 +310,7 @@ def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set =
                 previous_vol = eff_portfolio.vol
             
                 current_vol = eff_portfolio.vol - vol_step
+                current_excess_returns = eff_portfolio.excess_returns
   
             except:
                 break
@@ -318,9 +319,23 @@ def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set =
         
         vol_step /= 10
         current_vol = previous_vol - vol_step
+        
+    LOWER_RETURNS = universe.min_returns
+    target_returns = np.linspace(current_excess_returns, LOWER_RETURNS, return_steps)
+    
+    for target in target_returns:
+        eff_portfolio = Portfolio(universe)
+        try:
+            eff_portfolio = efficient_portfolio(eff_portfolio, target, factor_bounds = factor_bounds, cov_type = cov_type)
+            efficient_frontier_vols.append(eff_portfolio.vol)
+            efficient_frontier_returns.append(eff_portfolio.excess_returns)
+        except:
+            
+            break
+    
   
-    efficient_frontier_returns.append(universe.min_returns)
-    efficient_frontier_vols.append(previous_vol)
+    #efficient_frontier_returns.append(universe.min_returns)
+    #efficient_frontier_vols.append(previous_vol)
     return ((efficient_frontier_vols, efficient_frontier_returns), constrained_max_sharpe_portfolio) 
 
 def same_weights(weights1, weights2, threshold=1e-3):
