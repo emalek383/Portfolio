@@ -5,4 +5,4 @@ cvxpy
 statsmodels
 requests
 streamlit_javascript
-pyyaml ua_parser user_agents
+pyyaml
