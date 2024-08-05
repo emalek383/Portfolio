@@ -27,18 +27,9 @@ def format_performance_df_for_mobile(df, format_map):
         }
     mobile_df.rename(columns = column_map, inplace = True)
     
-    # mobile_df['Portfolio'] = mobile_df.index.str.replace(' Portfolio', '')
-    # mobile_df.set_index('Portfolio', inplace=True)
-    
     mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
-    #mobile_df.set_index('Portfolio', inplace = True)
-    #mobile_df.index = mobile_df.index.astype(str)
-    #mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
-    # mobile_df.insert(0, 'Portfolio', mobile_df.index)
-    #mobile_df.index = range(len(mobile_df))
     
     mobile_format_map = {column_map.get(k, k): v for k, v in format_map.items()}
-    #mobile_format_map['Portfolio'] = str
     
     return mobile_df, mobile_format_map
 
@@ -1116,7 +1107,7 @@ def display_portfolio_comparison(output, portfolios, factor_bounds = None):
     col1, col2, col3 = output.columns([0.05, 0.8, 0.15])
     col2.pyplot(fig, use_container_width = False)
     
-def style_table(df, format_map = None):
+def style_table(df, format_map = None, is_mobile = False):
     styled = df.style
     if format_map:
         styled = styled.format(format_map)
@@ -1125,9 +1116,8 @@ def style_table(df, format_map = None):
 
     html_table = styled.to_html(index = False)
 
-    print(html_table)
-    html_table = html_table.replace('<th class="blank level0" >&nbsp;', '<th>Portfolio')
-    print(html_table)
+    if is_mobile:
+        html_table = html_table.replace('<th class="blank level0" >&nbsp;', '<th>Portfolio')
     
     html_table = f'<div class="styled-table">{html_table}</div>'
     
