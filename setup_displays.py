@@ -250,7 +250,7 @@ def plot_interactive_efficient_frontier(eff_frontier_data):
             x=constrained_eff_vols, 
             y=constrained_eff_excess_returns, 
             mode='lines', 
-            name='Factor Constrained Efficient Frontier', 
+            name= 'Constr. Eff. Frontier' if is_mobile() else 'Constrained Efficient Frontier', 
             line=dict(color='orange', dash='dash'),
             hovertemplate='<b>Constrained Efficient Frontier</b><br>Volatility: %{x:.2%}<br>Excess Return: %{y:.2%}<br>Sharpe Ratio: %{customdata:.2f}<extra></extra>',
             customdata=constrained_ef_sharpe_ratios
