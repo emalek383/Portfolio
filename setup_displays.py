@@ -732,7 +732,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
     others_label = None
     
     names_fontsize = 20 if is_mobile() else 12
-    pct_fontsize = 16 if is_mobile() else 12
+    pct_fontsize = 18 if is_mobile() else 12
     others_fontsize = 18 if is_mobile() else 12
 
     for idx, (_, portfolio) in enumerate(portfolios):
@@ -760,9 +760,15 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
             
         portfolio_colors = [color_dict.get(stock, '#DDDDDD') for stock in stocks]  # Use light grey for 'Others'
         
+        if is_mobile():
+            pct_formatting = lambda pct: f'{pct:.0f}%' if pct > label_threshold * 100 else ''
+        else:
+            pct_formatting = lambda pct: f'{pct:.1f}%' if pct > label_threshold * 100 else ''
+        
         wedges, texts, autotexts = axes[idx].pie(weights,
                                                  colors = portfolio_colors,
-                                                 autopct = lambda pct: f'{pct:.1f}%' if pct > label_threshold * 100 else '',
+                                                 autopct = pct_formatting,
+                                                 #autopct = lambda pct: f'{pct:.1f}%' if pct > label_threshold * 100 else '',
                                                  pctdistance=0.75,
                                                  textprops={'fontsize': pct_fontsize}
                                                  )
