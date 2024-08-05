@@ -4,5 +4,5 @@ yfinance==0.2.41
 cvxpy
 statsmodels
 requests
-streamlit-javascript
+streamlit_javascript
 pyyaml ua-parser user-agents
