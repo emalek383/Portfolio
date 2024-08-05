@@ -732,6 +732,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
     others_label = None
     
     names_fontsize = 20 if is_mobile() else 12
+    pct_fontsize = 16 if is_mobile() else 12
     others_fontsize = 18 if is_mobile() else 12
 
     for idx, (_, portfolio) in enumerate(portfolios):
@@ -763,7 +764,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
                                                  colors = portfolio_colors,
                                                  autopct = lambda pct: f'{pct:.1f}%' if pct > label_threshold * 100 else '',
                                                  pctdistance=0.75,
-                                                 textprops={'fontsize': others_fontsize}
+                                                 textprops={'fontsize': pct_fontsize}
                                                  )
         for i, (wedge, autotext) in enumerate(zip(wedges, autotexts)):
             if weights[i] >= label_threshold:
@@ -782,7 +783,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
         if is_mobile():
             title = title.replace('Constrained', 'Constr.')
             
-        axes[idx].set_title(portfolio.name + ' Portfolio', fontsize = names_fontsize)
+        axes[idx].set_title(title, fontsize = names_fontsize)
         
     # Add "Others" to the end of the legend if it exists
     if others_element is not None:
