@@ -25,6 +25,7 @@ def format_performance_df_for_mobile(df, format_map):
         'Volatility': 'Vol',
         'Sharpe Ratio': 'Sharpe'
         }
+    
     mobile_df.rename(columns = column_map, inplace = True)
     
     mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
@@ -584,7 +585,7 @@ def display_portfolio_performances(output, portfolios):
     if is_mobile():
         joined_perf_df, format_map = format_performance_df_for_mobile(joined_perf_df, format_map)
     
-    html_table = style_table(joined_perf_df, format_map)
+    html_table = style_table(joined_perf_df, format_map, is_mobile())
     wrapped_table = f'<div class="table-wrapper-75">{html_table}</div>'
     output.markdown(wrapped_table, unsafe_allow_html = True)
     
