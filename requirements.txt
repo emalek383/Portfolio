@@ -5,6 +5,7 @@ cvxpy
 statsmodels
 requests
 streamlit_javascript
-ua-parser==0.10.0
-user-agents==2.2.0
+PyYAML
+ua-parser
+user-agents
 streamlit>=1.10.0
