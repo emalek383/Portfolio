@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import streamlit as st
+import streamlit.components.v1 as components
 # from streamlit_dimensions import st_dimensions
 from process_forms import process_stock_form
 from helper_functions import get_mean_returns, format_factor_choice, format_covariance_choice
@@ -13,6 +14,35 @@ from plotly.subplots import make_subplots
 TRADING_DAYS = 252
 
 state = st.session_state
+
+def is_mobile():
+    return not state.is_session_pc
+
+# def inject_screen_detector():
+#     st.markdown("""
+#     <script>
+#     const sendScreenInfo = () => {
+#         const width = window.innerWidth;
+#         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+#         window.parent.postMessage({
+#             type: 'streamlit:setScreenInfo',
+#             width: width,
+#             isMobile: isMobile
+#         }, '*');
+#     };
+#     sendScreenInfo();
+#     window.addEventListener('resize', sendScreenInfo);
+#     </script>
+#     """, unsafe_allow_html=True)
+    
+# def get_screen_info():
+#     if 'screen_info' not in state:
+#         state.screen_info = {'width': None, 'isMobile': False}
+#     return state.screen_info
+
+# def is_narrow_screen():
+#     screen_info = get_screen_info()
+#     return screen_info['width'] is not None and screen_info['width'] < 768 or screen_info['isMobile']
 
 def setup_dashboard(display):
     display.header("Overview")
@@ -189,11 +219,8 @@ def setup_details_display(display):
     
     return display
 
-def interactive_efficient_frontier_display(display):
-    eff_vols, eff_excess_returns = get_efficient_frontier(state.cov_type, constrained=False)
-    if len(eff_vols) == 0 or len(eff_excess_returns) == 0:
-        display.error("Failed to load efficient frontier. Need at least two stocks to have a viable portfolio.")
-        return display
+def plot_interactive_efficient_frontier(eff_frontier_data):
+    eff_vols, eff_excess_returns = eff_frontier_data
     
     factor_bounds = state.factor_bounds
     constrained_eff_frontier = get_efficient_frontier(state.cov_type, constrained=True)
@@ -281,19 +308,26 @@ def interactive_efficient_frontier_display(display):
         customdata=[excess_returns[i]/vols[i] for i in range(len(vols))]
     ))
     
+    legend_font_size = 10 if is_mobile() else 17
+    axis_label_font_size = 10 if is_mobile() else 20
+    title_font_size = 16 if is_mobile() else 24
+    tickformat = '.2f' if is_mobile() else '.2%'
+    margin = dict(l = 0, r = 15, t = 50, b = 50) if is_mobile() else dict(l = 50, r = 50, t = 50, b = 50)
+    standoff = 4 if is_mobile() else 8
+    
     fig.update_layout(
         title={
             'text': 'Excess Returns vs Volatility for Portfolios',
-            'font': {'size': 24, 'color': 'black'}
+            'font': {'size': title_font_size, 'color': 'black'}
             },
-        xaxis_title={'text': 'Volatility', 'font': {'size': 20, 'color': 'black'}},
-        yaxis_title={'text': 'Excess Return', 'font': {'size': 20, 'color': 'black'}},
+        #xaxis_title={'text': 'Volatility', 'font': {'size': axis_label_font_size, 'color': 'black'}},
+        #yaxis_title={'text': 'Excess Return', 'font': {'size': axis_label_font_size, 'color': 'black'}},
         legend=dict(
-            font=dict(size=17, color='black'),
+            font=dict(size=legend_font_size, color='black'),
             yanchor="top",
             y=0.99,
             xanchor="left",
-            x=0.01
+            x=0.01,
         ),
         hovermode="closest",
         height=800,
@@ -301,7 +335,8 @@ def interactive_efficient_frontier_display(display):
         plot_bgcolor='white',
         paper_bgcolor='white',
         xaxis=dict(
-            tickformat='.2%', 
+            title = dict(text = "Volatility", font = {'size': axis_label_font_size, 'color': 'black'}, standoff = standoff),
+            tickformat=tickformat, 
             gridcolor='lightgray',
             tickfont=dict(color='black'), 
             title_font=dict(color='black'),
@@ -311,7 +346,8 @@ def interactive_efficient_frontier_display(display):
             mirror = True
         ),
         yaxis=dict(
-            tickformat='.2%', 
+            title = dict(text = "Excess Returns", font = {'size': axis_label_font_size, 'color': 'black'}, standoff = standoff),
+            tickformat=tickformat, 
             gridcolor='lightgray',
             tickfont=dict(color='black'), 
             title_font=dict(color='black'),
@@ -319,10 +355,121 @@ def interactive_efficient_frontier_display(display):
             linewidth = 2,
             linecolor ='black',
             mirror = True
-        )
+        ),
+        margin=margin,
+        autosize=True,
     )
     
-    display.plotly_chart(fig, use_container_width=True)
+    
+    return fig
+
+def create_modal(plot_html):
+    print("\n Running modal")
+    modal_html = f"""
+    <style>
+        .modal {{
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }}
+        .modal-content {{
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            height: 90%;
+        }}
+        .close {{
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }}
+        .close:hover,
+        .close:focus {{
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }}
+        @media screen and (max-width: 768px) {{
+            .modal-content {{
+                width: 100%;
+                height: 100%;
+                margin: 0;
+            }}
+        }}
+    </style>
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            {plot_html}
+        </div>
+    </div>
+    <script>
+        var modal = document.getElementById("myModal");
+        var span = document.getElementsByClassName("close")[0];
+        span.onclick = function() {{
+            modal.style.display = "none";
+        }}
+        window.onclick = function(event) {{
+            if (event.target == modal) {{
+                modal.style.display = "none";
+            }}
+        }}
+        function showModal() {{
+            modal.style.display = "block";
+            if (window.matchMedia("(max-width: 768px)").matches) {{
+                try {{
+                    screen.orientation.lock('landscape');
+                }} catch (error) {{
+                    console.error('Unable to lock screen orientation:', error);
+                }}
+            }}
+        }}
+    </script>
+    """
+    return modal_html
+
+def interactive_efficient_frontier_display(display):
+    eff_vols, eff_excess_returns = get_efficient_frontier(state.cov_type, constrained=False)
+    if len(eff_vols) == 0 or len(eff_excess_returns) == 0:
+        display.error("Failed to load efficient frontier. Need at least two stocks to have a viable portfolio.")
+        return display
+    
+    fig = plot_interactive_efficient_frontier((eff_vols, eff_excess_returns))
+    
+    #inject_screen_detector()
+    
+    # if is_mobile():
+    #     # For mobile, show a button that opens the plot in a modal
+    #     print("\n On Mobile!")
+    #     if 'modal_created' not in state:
+    #         state.modal_created = False
+
+    #     if not state.modal_created:
+    #         # Generate the plot HTML
+    #         plot_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+            
+    #         # Create the modal
+    #         modal_html = create_modal(plot_html)
+    #         components.html(modal_html, height=0)
+    #         state.modal_created = True
+
+    #     if display.button("View Efficient Frontier Plot"):
+    #         st.write('<script>showModal();</script>', unsafe_allow_html=True)
+    
+    #else:
+    if True:
+        st.plotly_chart(fig, use_container_width = True, config = {'responsive': True, 'displayModeBar': False,})
+    
+    #display.plotly_chart(fig, use_container_width=True)
     
     return display
 
@@ -435,6 +582,9 @@ def display_portfolio_performances(output, portfolios):
         
     output.markdown("#### Performance ####")
     joined_perf = []
+    
+    if not portfolios:
+        return
     
     for _, portfolio in portfolios:
         perf_df, format_map = portfolio.get_performance_df()

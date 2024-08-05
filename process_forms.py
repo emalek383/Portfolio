@@ -43,8 +43,6 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
 
     """
     
-    clear_all_portfolio_data()
-    
     errors = ""
     
     # If stock_list, start_date or end_date are missing, use saved
@@ -83,7 +81,9 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
                 errors += "Less than two stocks entered. Need at least two stocks to construct a meaningful portfolio."
                 return errors
         
+            clear_all_portfolio_data()
             universe = StockUniverse(list(cleaned_stocks), start_date, end_date, risk_free_rate = risk_free_rate)
+            print("\n Calculating stock universe!")
             if not universe:
                 errors += "Could not build stock universe. Try again."
                 return errors

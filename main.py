@@ -2,6 +2,8 @@ import streamlit as st
 from process_forms import process_stock_form
 from setup_forms import setup_covariance_form
 from portfolio_state_manager import initialise_portfolio_state, update_efficient_frontier
+from streamlit_javascript import st_javascript
+from user_agents import parse
 
 st.set_page_config(layout="wide")
 
@@ -23,6 +25,12 @@ if 'cov_type' not in state:
     state.cov_type = 'sample_cov'
 
 initialise_portfolio_state()
+
+ua_string = st_javascript("""window.navigator.userAgent;""")
+user_agent = parse(ua_string)
+state.is_session_pc = user_agent.is_pc
+print("\n Reloading")
+print(f"PC? {state.is_session_pc}")
 
 dashboard = st.Page("my_pages/dashboard.py", title = "Portfolio Analysis")
 #analysis = st.Page("my_pages/analysis.py", title = "Portfolio Analysis")

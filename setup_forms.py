@@ -83,7 +83,7 @@ def setup_weights_form(form, cols_per_row = 6):
     
     form.write("Change the relative weights of your portfolio.")
     weights = ask_for_weights(form, state.portfolios['custom'].weights, cols_per_row)
-    form.button(label = "Calculate Performance",
+    form.button(label = "Adjust Weights",
                 on_click = recompute_portfolio,
                 args = (weights, ))
 
