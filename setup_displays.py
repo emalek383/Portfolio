@@ -267,9 +267,9 @@ def plot_interactive_efficient_frontier(eff_frontier_data):
     
     portfolio_plot_settings = {
         'max_sharpe': {'marker': 'star', 'size': 15, 'color': 'green', 'label': 'Max Sharpe Portfolio'},
-        'constrained_max_sharpe': {'marker': 'star', 'size': 15, 'color': 'orange', 'label': 'Constrained Max Sharpe Portfolio'},
+        'constrained_max_sharpe': {'marker': 'star', 'size': 15, 'color': 'orange', 'label': 'Constr. Max Sharpe Portfolio' if is_mobile() else 'Constrained Max Sharpe Portfolio'},
         'min_vol': {'marker': 'x', 'size': 15, 'color': 'green', 'label': 'Min Vol Portfolio'},
-        'constrained_min_vol': {'marker': 'x', 'size': 15, 'color': 'orange', 'label': 'Constrained Min Vol Portfolio'},
+        'constrained_min_vol': {'marker': 'x', 'size': 15, 'color': 'orange', 'label': 'Constr. Min Vol Portfolio' if is_mobile() else 'Constrained Min Vol Portfolio'},
         'custom': {'marker': 'x', 'size': 15, 'color': 'blue', 'label': 'Custom Portfolio'}
     }
     
