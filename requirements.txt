@@ -7,3 +7,4 @@ requests
 streamlit_javascript
 ua-parser==0.10.0
 user-agents==2.2.0
+streamlit>=1.10.0
