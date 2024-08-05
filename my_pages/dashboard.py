@@ -15,7 +15,6 @@ if not state.loaded_stocks:
         state.eff_frontier = state.universe.calc_efficient_frontier()
 
 with st.sidebar:        
-    #stock_select_expander = st.expander(label = "Select stocks for portfolio", expanded = True)
     st.header("Select stocks for portfolio")
     stock_selection_form = st.form(border = False, key = "stock_form")
     
@@ -25,12 +24,15 @@ overview_display = st.container(border = False)
 performance_display = st.container(border = False)
 weights_display = st.container(border = False)
 efficient_frontier_display = st.container(border = False)
-efficient_frontier_display.subheader("Efficient Frontier")
+if state.universe and len(state.universe.stocks) >= 2:
+    efficient_frontier_display.subheader("Efficient Frontier")
 
 #setup_dashboard(portfolio_display)
-
-sorted_portfolios = iterate_portfolios(state.cov_type, include_constrained = True)
 setup_overview_display(overview_display)
-display_portfolio_performances(performance_display, sorted_portfolios)
-display_portfolio_weights(weights_display, sorted_portfolios)
-interactive_efficient_frontier_display(efficient_frontier_display)
+print(state.universe.stocks)
+print(state.portfolios)
+if state.universe and len(state.universe.stocks) >= 2:
+    sorted_portfolios = iterate_portfolios(state.cov_type, include_constrained = True)
+    display_portfolio_performances(performance_display, sorted_portfolios)
+    display_portfolio_weights(weights_display, sorted_portfolios)
+    interactive_efficient_frontier_display(efficient_frontier_display)
