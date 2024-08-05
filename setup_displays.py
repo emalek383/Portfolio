@@ -29,6 +29,7 @@ def format_performance_df_for_mobile(df, format_map):
     mobile_df.rename(columns = column_map, inplace = True)
     
     mobile_df.index = mobile_df.index.str.replace(' Portfolio', '')
+    mobile_df.index = mobile_df.index.str.replace('Constrained', 'Constr.')
     
     mobile_format_map = {column_map.get(k, k): v for k, v in format_map.items()}
     
