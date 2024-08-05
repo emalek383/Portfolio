@@ -780,7 +780,7 @@ def display_weights_pie_charts(output, portfolios, label_threshold, group_thresh
         
         title = portfolio.name + ' Portfolio'
         if is_mobile():
-            title.replace('Constrained', 'Constr.')
+            title = title.replace('Constrained', 'Constr.')
             
         axes[idx].set_title(portfolio.name + ' Portfolio', fontsize = names_fontsize)
         
