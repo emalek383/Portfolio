@@ -439,12 +439,12 @@ def create_modal(plot_html):
     return modal_html
 
 def interactive_efficient_frontier_display(display):
-    eff_vols, eff_excess_returns = get_efficient_frontier(state.cov_type, constrained=False)
-    if len(eff_vols) == 0 or len(eff_excess_returns) == 0:
+    eff_frontier_data = get_efficient_frontier(state.cov_type, constrained=False)
+    if not eff_frontier_data or len(eff_frontier_data) != 2:
         display.error("Failed to load efficient frontier. Need at least two stocks to have a viable portfolio.")
         return display
     
-    fig = plot_interactive_efficient_frontier((eff_vols, eff_excess_returns))
+    fig = plot_interactive_efficient_frontier(eff_frontier_data)
     
     #inject_screen_detector()
     
