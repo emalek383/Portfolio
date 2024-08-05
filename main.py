@@ -5,8 +5,24 @@ from portfolio_state_manager import initialise_portfolio_state, update_efficient
 from streamlit_javascript import st_javascript
 from user_agents import parse
 
+def detect_device():
+    if 'is_session_pc' not in st.session_state:
+        st.session_state.is_session_pc = True
+        #with st.spinner("Detecting device..."):
+    try:
+        ua_string = st_javascript("navigator.userAgent")
+        if ua_string is not None:
+            user_agent = parse(ua_string)
+            st.session_state.is_session_pc = user_agent.is_pc
+        else:
+            st.session_state.is_session_pc = True  # Default to PC if detection fails
+    except Exception:
+        st.session_state.is_session_pc = True  # Default to PC if an error occurs
+    return st.session_state.is_session_pc
+
 st.set_page_config(layout="wide")
 
+is_pc = detect_device()
 
 state = st.session_state
 if 'loaded_stocks' not in state:
@@ -26,9 +42,9 @@ if 'cov_type' not in state:
 
 initialise_portfolio_state()
 
-ua_string = st_javascript("""window.navigator.userAgent;""")
-user_agent = parse(ua_string)
-state.is_session_pc = user_agent.is_pc
+# # ua_string = st_javascript("""window.navigator.userAgent;""")
+# # user_agent = parse(ua_string)
+# # state.is_session_pc = user_agent.is_pc
 print("\n Reloading")
 print(f"PC? {state.is_session_pc}")
 
