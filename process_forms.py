@@ -1,16 +1,35 @@
+""" Process the Streamlit forms. """
+
 import numpy as np
 import streamlit as st
 
 from StockUniverse import StockUniverse, Portfolio
+from portfolio_state_manager import clear_factor_cov_data, clear_factor_constrained_data, update_efficient_frontier, update_portfolio, get_portfolio, clear_all_portfolio_data
 from data_loader import load_default_stocks, load_default_bonds, load_factor_df
-from optimisers import minimise_vol, maximise_returns, maximise_sharpe, efficient_portfolio
-from helper_functions import convert_to_date, get_default_factor_bounds, portfolio_satisfies_constraints, format_covariance_choice
-from portfolio_state_manager import clear_factor_cov_data, clear_factor_constrained_data, update_efficient_frontier, update_portfolio, get_portfolio, clear_all_portfolio_data, get_efficient_frontier
+from optimisers import minimise_vol, maximise_returns, efficient_portfolio
+from helper_functions import convert_to_date, get_default_factor_bounds, portfolio_satisfies_constraints, format_covariance_choice, same_weights
 
 state = st.session_state
 
 def update_covariance_choice(cov_type):
+    """
+    Update the choice of estimation method for the covariance matrix.
+    Update in state and recompute the custom portfolio performance.
+    Remaining portfolios are already saved with all estimation methods.
+
+    Parameters
+    ----------
+    cov_type : str
+        Estimation method for the covariance matrix.
+
+    Returns
+    -------
+    None.
+
+    """
+    
     state.cov_type = cov_type
+    
     # Recompute the custom portfolio with given weights
     custom_portfolio = get_portfolio('custom')
     custom_portfolio.calc_performance(cov_type = cov_type)
@@ -65,7 +84,6 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
                 cleaned_stocks.add(stock)
         
         # If stocks, start and end date are the same as loaded, just use the loaded data
-        
         if (state.universe and state.universe.stocks and set(state.universe.stocks) == cleaned_stocks and 
             state.universe.start_date and state.universe.start_date == start_date and
             state.universe.end_date and state.universe.end_date == end_date):
@@ -83,7 +101,6 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         
             clear_all_portfolio_data()
             universe = StockUniverse(list(cleaned_stocks), start_date, end_date, risk_free_rate = risk_free_rate)
-            print("\n Calculating stock universe!")
             if not universe:
                 errors += "Could not build stock universe. Try again."
                 return errors
@@ -115,8 +132,6 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         eff_frontier_data, max_sharpe_portfolio = universe.calc_efficient_frontier()
     
     update_efficient_frontier(eff_frontier_data, cov_type = 'sample_cov')
-    print("\n Upated the efficient frontier")
-    print(f"Keys in state: {list(state.keys())}")
     
     update_portfolio('max_sharpe', universe.max_sharpe_portfolio, cov_type = 'sample_cov')
     update_portfolio('min_vol', universe.min_vol_portfolio, cov_type = 'sample_cov')
@@ -155,11 +170,34 @@ def recompute_portfolio(weights):
     
     return None
 
-
 def extract_factor_bounds(factor_list, factor_bounds_values):
+    """
+    Extract the non-trivial constraints on factor exposure from the allowed factor exposures.
+    A constraint is trivial:
+        for lower bound if it is equal to the lower endpoint of the allowed range,
+        for upper bound if it is equal to the upper endpoint of the allowed range.
+    Save the constraints in a dictionary
+        factor_bounds = {factor: [lower, upper]}
+    with lower / upper = None if the constraint is trivial. If both constraints are trivial,
+    don't include the factor in the dictionary.
+
+    Parameters
+    ----------
+    factor_list : list(str)
+        List of the names of factors.
+    factor_bounds_values : list(float, float)
+        List of lower/upper constraints for each factor.
+
+    Returns
+    -------
+    factor_bounds : dict
+        Dictionary containing non-trivial factor constraints. In the form {factor: [lower, upper]}
+        with lower or upper = None if the constraint is trivial and factors with no constraints not appearing.
+
+    """
+    
     factor_bounds = {}
     factor_ranges = get_default_factor_bounds(state.universe)
-    print(f"Default factor ranges: {factor_ranges}")
     for idx, factor in enumerate(factor_list):
         factor_bounds_values[idx] = list(factor_bounds_values[idx])
         if factor_bounds_values[idx] == list(factor_ranges[factor]):
@@ -174,18 +212,30 @@ def extract_factor_bounds(factor_list, factor_bounds_values):
         
     return factor_bounds
 
-def impose_factor_constraints(factor_model, factor_list, factor_bounds_values):
-    print("\nStarting impose_factor_constraints")
+def impose_factor_constraints(factor_list, factor_bounds_values):
+    """
+    Impose the new factor constraints, calculate the constrained efficient frontier, max sharpe and min vol portfolios, using
+    sample and factor-based covariance.
+
+    Parameters
+    ----------
+    factor_list : list(str)
+        List of the names of factors.
+    factor_bounds_values : list(float, float)
+        List of lower/upper constraints for each factor.
+
+    Returns
+    -------
+    None.
+
+    """
+    
     factor_bounds = extract_factor_bounds(factor_list, factor_bounds_values)
     
-    print(f"factor bounds: {factor_bounds}")
     if factor_bounds == state.factor_bounds:
-        print("Factor bounds unchanged, returning")
         return 
             
-    print("Updating state.factor_bounds")
     state.factor_bounds = factor_bounds
-    print("Clearing constrained data")
     clear_factor_constrained_data()
     
     universe = state.universe
@@ -223,9 +273,10 @@ def impose_factor_constraints(factor_model, factor_list, factor_bounds_values):
         clear_ranges()
         
  
-def optimise_custom_portfolio(form, optimiser, target, factor_model = None, factor_bounds = None):
+def optimise_custom_portfolio(form, optimiser, target, factor_bounds = None):
     """
-    Optimise the custom portfolio according to the optimiser (min_vol or max_returns).
+    Optimise the custom portfolio according to the optimiser (min_vol or max_returns) and subject to any factor constraints.
+    If optimisation according to the factor constraints fails, try and optimise without factor constraints.
     Automatically updates portfolios in streamlit session_state.
     
 
@@ -235,6 +286,9 @@ def optimise_custom_portfolio(form, optimiser, target, factor_model = None, fact
         String corresponding to the chosen optimisation method.
     target : float
         Target to be met while optimising.
+    factor_bounds: dict, optional
+        Dictionary containing non-trivial factor constraints. In the form {factor: [lower, upper]}
+        with lower or upper = None if the constraint is trivial and factors with no constraints not appearing. Default None.
 
     Returns
     -------
@@ -251,7 +305,7 @@ def optimise_custom_portfolio(form, optimiser, target, factor_model = None, fact
     except Exception:
         if state.factor_bounds:
             form.info("Unable to optimise portfolio according to the target and am now optimising without the factor constraints.")
-            custom_portfolio = universe.optimise_portfolio(optimiser, target, cov_type = cov_type, factor_bounds = factor_bounds)
+            custom_portfolio = universe.optimise_portfolio(optimiser, target, cov_type = cov_type, factor_bounds = None)
         else:
             form.error("Unable to optimise your portfolio.")
             custom_portfolio = get_portfolio('custom')
@@ -260,6 +314,19 @@ def optimise_custom_portfolio(form, optimiser, target, factor_model = None, fact
     update_portfolio('custom', custom_portfolio)
     
 def process_factor_analysis_form(factor_model):
+    """
+    Run a factor analysis with the chosen factor model on the stock universe.
+
+    Parameters
+    ----------
+    factor_model : str
+        Choice of factor model to be used for the analysis.
+
+    Returns
+    -------
+    None.
+
+    """
     factor_df = load_factor_df(factor_model)
     state.universe.run_factor_analysis(factor_df)
     state.factor_model = factor_model
@@ -274,14 +341,73 @@ def process_factor_analysis_form(factor_model):
         st.info(f"Note that the factor analysis only covers {date_range.days} days and may not be reliable!")
     
 def clear_ranges():
+    """
+    Clear the factor constraints and the associated data (eff frontier, portfolios) from state.
+
+    Returns
+    -------
+    None.
+
+    """
+    
     state.factor_bounds = {}
     clear_factor_constrained_data()
     
 def clear_factor_analysis():
+    """
+    Clear the factor analysis and associated factor constraints from state.
+
+    Returns
+    -------
+    None.
+
+    """
+    
     state.factor_model = None
     clear_ranges()
     
 def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set = (0, 1), initial_steps = 500, max_refinements = 5, vol_tolerance = 1e-8, max_iters = 1_000, return_steps = 200):
+    """
+    Calculate the (constrained) efficient frontier by sweeping through the potential max volatilities and optimising portfolio returns subject to each such max volatility.
+    Run this iteratively, decreasing the steps in potential max volatility when either two subsequent optimised portfolios have the same volatility (i.e. volatility converges onto min),
+    the optimisatino fails (i.e. volatility is below the min volatility) or when number of iterations gets too large to avoid numerical instabilities.
+    
+    Along the way, keep track of the max Sharpe Ratio found and the Max Sharpe Portfolio. This is computationally more effective than maximising Sharpe Ratio directly.
+    
+    Once this is finished and we've likely found the min vol portfolio, construct the lower half of the ( constrained) efficient frontier by optimising portfolios according to
+    a set of target returns from the min vol portfolio down to the smallest return in the stock universe.
+
+    Parameters
+    ----------
+    universe : StockUniverse.StockUniverse
+        Stock Universe whose constrained efficient frontier we want to compute.
+    factor_bounds : factor_bounds : dict
+        Dictionary containing non-trivial factor constraints. In the form {factor: [lower, upper]}
+        with lower or upper = None if the constraint is trivial and factors with no constraints not appearing.
+    cov_type : str, optional
+        Covariance estimation method used. The default is 'sample_cov'.
+    constraint_set : Tuple(float, float), optional
+        Max and min weights allowed. The default is (0, 1).
+    initial_steps : float, optional
+        Number of initial volatility steps we'll try. The default is 500.
+    max_refinements : int, optional
+        Number of refinements of the volatility steps we will make. The default is 5.
+    vol_tolerance : float, optional
+        Numerical tolerance for volatility of two subsequent portfolios being the same. The default is 1e-8.
+    max_iters : int, optional
+        Maximum number of iterations for each volatility step we will allow. The default is 1_000.
+    return_steps : int, optional
+        Number of target returns we want to hit below the min vol portfolio. The default is 200.
+
+    Returns
+    -------
+    efficient_frontier_data : tuple(list(float), list(float))
+        Tuple containing the list of volatilities and excess returnns of efficient portfolios (i.e. minimising vol given returns).
+    constrained_max_sharpe_portfolio : StockUniverse.Portfolio
+        Constrained Max Sharpe Portfolio.
+
+    """
+    
     max_vol = universe.max_vol
     
     UPPER_VOL = max_vol
@@ -305,7 +431,10 @@ def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set =
             
                 if not constrained_max_sharpe_portfolio or eff_portfolio.sharpe_ratio > constrained_max_sharpe_portfolio.sharpe_ratio:
                     constrained_max_sharpe_portfolio = eff_portfolio
-                    constrained_max_sharpe_portfolio.name = "Constrained Max Sharpe"
+                    if factor_bounds:
+                        constrained_max_sharpe_portfolio.name = "Constrained Max Sharpe"
+                    else:
+                        constrained_max_sharpe_portfolio.name = "Max Sharpe"
                 
                 previous_vol = eff_portfolio.vol
             
@@ -332,21 +461,22 @@ def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set =
         except:
             
             break
+        
+    efficient_frontier_data = (efficient_frontier_vols, efficient_frontier_returns)
     
-  
-    #efficient_frontier_returns.append(universe.min_returns)
-    #efficient_frontier_vols.append(previous_vol)
-    return ((efficient_frontier_vols, efficient_frontier_returns), constrained_max_sharpe_portfolio) 
-
-def same_weights(weights1, weights2, threshold=1e-3):
-    if len(weights1) != len(weights2):
-        return False
-    
-    weights_diff = np.abs(weights1 - weights2)
-    
-    return np.all(weights_diff < threshold)
+    return efficient_frontier_data, constrained_max_sharpe_portfolio
 
 def initialise_factor_covariance_matrix():
+    """
+    Initialise the factor-based estimate of the covariance matrix by computing the efficient frontier with it and 
+    saving the max sharpe and min vol portfolios in state.
+
+    Returns
+    -------
+    None.
+
+    """
+    
     clear_factor_cov_data()
     clear_factor_constrained_data()
     

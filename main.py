@@ -1,24 +1,57 @@
 import streamlit as st
-from process_forms import process_stock_form
-from setup_forms import setup_covariance_form
-from portfolio_state_manager import initialise_portfolio_state, update_efficient_frontier
 from streamlit_javascript import st_javascript
 from user_agents import parse
 
+from portfolio_state_manager import initialise_portfolio_state, update_efficient_frontier
+from setup_forms import setup_covariance_form
+from process_forms import process_stock_form
+
+
 def detect_device():
+    """
+    Detect whether the page is being viewed on PC.
+
+    Returns
+    -------
+    bool
+        True if being viewed on PC, false otherwise.
+
+    """
+    
     if 'is_session_pc' not in st.session_state:
         st.session_state.is_session_pc = True
-        #with st.spinner("Detecting device..."):
     try:
         ua_string = st_javascript("navigator.userAgent")
         if ua_string is not None:
             user_agent = parse(ua_string)
             st.session_state.is_session_pc = user_agent.is_pc
         else:
-            st.session_state.is_session_pc = True  # Default to PC if detection fails
+            st.session_state.is_session_pc = True
     except Exception:
-        st.session_state.is_session_pc = True  # Default to PC if an error occurs
+        st.session_state.is_session_pc = True
     return st.session_state.is_session_pc
+
+
+def load_css(file_name):
+    """
+    Load CSS file into streamlit.
+
+    Parameters
+    ----------
+    file_name : str
+        CSS file filename.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    with open(file_name) as f:
+        css_content = f.read()
+        st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+
+
 
 st.set_page_config(layout="wide")
 
@@ -42,58 +75,23 @@ if 'cov_type' not in state:
 
 initialise_portfolio_state()
 
-# # ua_string = st_javascript("""window.navigator.userAgent;""")
-# # user_agent = parse(ua_string)
-# # state.is_session_pc = user_agent.is_pc
-print("\n Reloading")
-print(f"PC? {state.is_session_pc}")
-
 dashboard = st.Page("my_pages/dashboard.py", title = "Portfolio Analysis")
-#analysis = st.Page("my_pages/analysis.py", title = "Portfolio Analysis")
 optimisation = st.Page("my_pages/portfolio_optimisation.py", title = "Portfolio Optimisation")
 factor_analysis = st.Page("my_pages/factor_analysis.py", title = "Factor Analysis")
-#customisation = st.Page("my_pages/customise_portfolio.py", title = "Customise Portfolio")
 pg = st.navigation([dashboard, optimisation, factor_analysis])
 pg.run()
 
-def load_css(file_name):
-    with open(file_name) as f:
-        css_content = f.read()
-        st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
-
 load_css('styles/style.css')
 
+# Create sidebar menu to choose the covariance matrix estimation
 if state.factor_model:
     with st.sidebar:
         covariance_method_form = st.container(border = False)
         covariance_method = setup_covariance_form(covariance_method_form)
 
+# Load default stocks, if no stocks are loaded yet
 if not state.loaded_stocks:
     process_stock_form()
     state.loaded_stocks = True
     if state.universe and len(state.universe.stocks) > 1:
         update_efficient_frontier(state.universe.calc_efficient_frontier(), cov_type = 'sample_cov')
-    
-# # with st.sidebar:        
-# #     stock_select_expander = st.expander(label = "Select stocks for portfolio", expanded = True)
-# #     stock_selection_form = stock_select_expander.form(border = False, key = "stock_form")
-    
-# #     factor_analysis_expander = st.expander(label = "Run factor analysis", expanded = True)
-# #     factor_analysis_form = factor_analysis_expander.container(border = False)
-    
-# #     optimise_expander = st.expander(label = "Optimise portfolio", expanded = True)
-# #     optimise_portfolio_form = optimise_expander.container(border = False)
-    
-# #     weights_expander = st.expander(label = "Manually adjust portfolio", expanded = False)
-# #     weights_form = weights_expander.container(border = False)
-
-# # portfolio_display = st.container(border = False)
-# # details_display = st.container(border = False)
-
-# # setup_stock_selection_form(stock_selection_form)
-# # setup_weights_form(weights_form)
-# # setup_optimise_portfolio_form(optimise_portfolio_form)
-# # setup_factor_analysis_form(factor_analysis_form)
-
-# # setup_portfolio_display(portfolio_display)
-# # setup_details_display(details_display)

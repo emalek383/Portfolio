@@ -1,10 +1,75 @@
+"""Module creating the FactorAnalysis class to run a factor analysis on a stock universe."""
+
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+
 from helper_functions import convert_to_date
 
 class FactorAnalysis():
+    """
+    Class to perform factor analysis on a stock universe. Contains methods to align data,
+    run factor analysis, compute factor-based covariance matrices, and analyse portfolios.
+    
+    Attributes
+    ----------
+    universe : StockUniverse.StockUniverse
+        The stock universe on which to perform factor analysis.
+    factor_returns : pd.DataFrame
+        Returns of the factors used in the analysis.
+    aligned_data : pd.DataFrame
+        Aligned stock and factor returns data.
+    results : dict
+        Results of the factor analysis for each stock.
+    factor_cov_matrix : pd.DataFrame
+        Covariance matrix of factor returns.
+    idiosyncratic_var : pd.Series
+        Idiosyncratic variances of stocks.
+    stock_cov_matrix : pd.DataFrame
+        Full covariance matrix of stock returns based on factor analysis.
+        
+    Methods
+    -------
+    get_date_range():
+        Returns the start and end dates of the aligned data.
+        
+    get_factor_exposures():
+        Returns factor exposures for all stocks.
+        
+    get_alphas():
+        Returns alphas for all stocks.
+        
+    get_r_squared():
+        Returns R-squared values for all stocks.
+        
+    get_summary():
+        Returns a summary of the factor analysis results.
+        
+    analyse_portfolio(portfolio):
+        Analyses a given portfolio using the factor analysis results.
+        
+    """
+    
     def __init__(self, universe, factor_returns):
+        """
+        Initialise the FactorAnalysis object with a stock universe and factor returns.
+
+        Parameters
+        ----------
+        universe : StockUniverse.StockUniverse
+            The stock universe to analyze.
+        factor_returns : pd.DataFrame
+            Returns of the factors used in the analysis.
+                Index: Date (pd.Timestamp, datetime)
+                Columns: Factor (str), must include 'RF' for risk-free-rate to be used
+
+        Returns
+        -------
+        None.
+        
+        """
+        
         self.universe = universe
         self.factor_returns = factor_returns
         
@@ -17,6 +82,20 @@ class FactorAnalysis():
         self.factor_cov_matrix, self.idiosyncratic_var, self.stock_cov_matrix = self._compute_factor_based_covariance()
         
     def _align_data(self):
+        """
+        Align stock return data with factor return data.
+
+        Returns
+        -------
+        aligned_data : pd.DataFrame
+            Index: Date (pd.DatetimeIndex)
+            Columns: Stock tickers and factor names (str),
+            Values: Daily simple returns (float), in basis points for factor returns
+            
+            Aligned data containing stock returns and factor returns.
+            
+        """
+        
         start_date = pd.Timestamp(self.universe.start_date)
         end_date = pd.Timestamp(self.universe.end_date)
         
@@ -33,11 +112,21 @@ class FactorAnalysis():
         return aligned_data
     
     def _run_factor_analysis(self):
+        """
+        Perform factor analysis on each stock in the universe.
+
+        Returns
+        -------
+        results : dict
+            Dictionary containing factor analysis results for each stock.
+            
+        """
+        
         results = {}
         
         for ticker in self.universe.stocks:
-            y = self.aligned_data[ticker] - self.aligned_data['RF']  # Excess returns
-            X = sm.add_constant(self.aligned_data[self.factor_returns.columns.drop('RF')] / 100)
+            y = self.aligned_data[ticker] - self.aligned_data['RF']
+            X = sm.add_constant(self.aligned_data[self.factor_returns.columns.drop('RF')] / 100) # Factor returns data is in basis points
             
             model = sm.OLS(y,X).fit()
             results[ticker] = {
@@ -51,6 +140,16 @@ class FactorAnalysis():
         return results
     
     def get_date_range(self):
+        """
+        Get the date range of the aligned data.
+
+        Returns
+        -------
+        start_date, end_date : datetime.date
+            The start date and end date.
+            
+        """
+        
         start_date = convert_to_date(self.aligned_data.index[0])
         end_date = convert_to_date(self.aligned_data.index[-1])
         
@@ -59,7 +158,18 @@ class FactorAnalysis():
     def get_factor_exposures(self):
         """
         Get factor exposures for all stocks.
+
+        Returns
+        -------
+        exposures : pd.DataFrame
+            Index: Asset tickers (str)
+            Columns: Factor names (str)
+            Values: Factor exposures (float)
+            
+            Factor exposures for all stocks.
+        
         """
+        
         exposures = pd.DataFrame({ticker: result['betas'] for ticker, result in self.results.items()}).T
         exposures.columns = self.factor_returns.columns.drop('RF')
         return exposures
@@ -67,19 +177,50 @@ class FactorAnalysis():
     def get_alphas(self):
         """
         Get alphas for all stocks.
+
+        Returns
+        -------
+        pd.Series
+            Index: Asset tickers (str)
+            Values: Alpha values (float)
+            
+            Alphas for all stocks.
+            
         """
+        
         return pd.Series({ticker: result['alpha'] for ticker, result in self.results.items()})
 
     def get_r_squared(self):
         """
         Get R-squared values for all stocks.
+
+        Returns
+        -------
+        pd.Series
+            Index: Asset tickers (str)
+            Values: R-squared values (float)
+            
+            R-squared values for all stocks.
+            
         """
+        
         return pd.Series({ticker: result['r_squared'] for ticker, result in self.results.items()})
 
     def get_summary(self):
         """
         Get a summary of the factor analysis results.
+
+        Returns
+        -------
+        pd.DataFrame
+            Index: Asset tickers (str)
+            Columns: 'Alpha', 'R-squared', and factor names (str)
+            Values: Corresponding values for each stock and factor (float)
+            
+            Summary of factor analysis results.
+            
         """
+        
         summary = pd.DataFrame({
             'Alpha': self.get_alphas(),
             'R-squared': self.get_r_squared()
@@ -90,9 +231,20 @@ class FactorAnalysis():
     def analyse_portfolio(self, portfolio):
         """
         Analyse a given portfolio using the factor analysis results.
+
+        Parameters
+        ----------
+        portfolio : Portfolio
+            The portfolio to analyse.
+
+        Returns
+        -------
+        dict
+            A dictionary containing:
+            - 'Factor Exposures': pd.DataFrame of portfolio factor exposures
+            - 'Alpha': float, portfolio alpha
+            
         """
-        # if not isinstance(portfolio, Portfolio):
-        #     raise TypeError("Input must be a Portfolio object")
         
         if portfolio.universe != self.universe:
             raise ValueError("The portfolio's universe does not match the FactorAnalysis universe.")
@@ -110,13 +262,31 @@ class FactorAnalysis():
     
     def _compute_factor_based_covariance(self):
         """
-        Compute the covariance matrix of the stock universe using factor analysis.
+        Estimate the covariance matrix of the stock universe using factor analysis.
         
-        Returns:
-        - factor_cov_matrix: DataFrame, covariance matrix of factor returns
-        - idiosyncratic_var: Series, idiosyncratic variances of stocks
-        - stock_cov_matrix: DataFrame, full covariance matrix of stock returns
+        Returns
+        -------
+        factor_cov_matrix : pd.DataFrame
+            Index: Factor name (str)
+            Columns: Factor name (str)
+            Value: Covariance of factor returns (float)
+            
+            Covariance matrix of factor returns
+        
+        idiosyncratic_var : pd.Series
+            Index: Stock ticker (str)
+                
+            Idiosyncratic variances of stocks
+            
+        stock_cov_matrix : pd.DataFrame
+            Index: Stock ticker (str)
+            Columns: Stock ticker (str)
+            Value: Covariance of stock returns (float)
+                
+            Full covariance matrix of stock returns
+        
         """
+        
         factor_exposures = self.get_factor_exposures()
         
         factor_returns = self.aligned_data[self.factor_returns.columns.drop('RF')] / 100
@@ -125,7 +295,7 @@ class FactorAnalysis():
         # Compute idiosyncratic returns
         stock_returns = self.aligned_data[self.universe.stocks]
         predicted_returns = factor_exposures @ factor_returns.T
-        # Correctly broadcast RF to match the dimensions of stock_returns
+        # Broadcast RF to match the dimensions of stock_returns
         rf_returns = self.aligned_data['RF'].values[:, np.newaxis] * np.ones_like(stock_returns)
         
         idiosyncratic_returns = stock_returns - predicted_returns.T - rf_returns

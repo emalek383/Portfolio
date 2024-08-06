@@ -1,8 +1,8 @@
 import streamlit as st
-from setup_forms import setup_optimise_portfolio_form, setup_weights_form
-from setup_displays import display_return_comparison, display_exposure_comparison, sort_portfolios, setup_efficient_frontier_display, setup_portfolio_overview, display_portfolio_weights, display_portfolio_performances, display_factor_bounds
-from setup_displays import interactive_efficient_frontier_display
+
 from portfolio_state_manager import iterate_portfolios, get_portfolio
+from setup_forms import setup_optimise_portfolio_form, setup_weights_form
+from setup_displays import setup_portfolio_weights_display, setup_portfolio_performances_display, setup_factor_bounds_display, setup_interactive_efficient_frontier_display
 
 state = st.session_state
 
@@ -17,7 +17,7 @@ with col1:
     
 with col2:
     if state.factor_bounds:
-        display_factor_bounds(st, state.factor_model, state.factor_bounds)
+        setup_factor_bounds_display(st, state.factor_model, state.factor_bounds)
             
     else:
         st.info("No factor constraints have been set. You can set constraints in the factor analysis section.")
@@ -33,14 +33,17 @@ tab1, tab2 = st.tabs(['Efficient Frontier', 'Portfolio Details'])
 tab1.subheader("Efficient Frontier")
 efficient_frontier_display = tab1.container(border = False)
 
-interactive_efficient_frontier_display(efficient_frontier_display)
+setup_interactive_efficient_frontier_display(efficient_frontier_display)
 
 tab2.subheader("Portfolio Details")
 portfolio_performances_display = tab2.container(border = False)
 portfolio_allocation_display = tab2.container(border = False)
 
 sorted_portfolios = iterate_portfolios(state.cov_type)
+
+# Show only the custom portfolio in the portfolio details display.
+# Need to pass custom portfolio as a list.
 portfolio_as_list = [['custom', get_portfolio('custom')]]
 
-display_portfolio_performances(portfolio_performances_display, sorted_portfolios)
-display_portfolio_weights(portfolio_allocation_display, portfolio_as_list)
+setup_portfolio_performances_display(portfolio_performances_display, sorted_portfolios)
+setup_portfolio_weights_display(portfolio_allocation_display, portfolio_as_list)

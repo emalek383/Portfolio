@@ -1,11 +1,20 @@
+"""Module creating the StockUniverse and Portfolio classes.
+
+Classes
+-------
+StockUniverse allows us to study a stock universe.
+Portfolio: allows us to study a portfolio of stoks.
+"""
+
 import numpy as np
 import pandas as pd
 import datetime as dt
 from dateutil.relativedelta import relativedelta
+
+from FactorAnalysis import FactorAnalysis
+from data_loader import download_data
 from helper_functions import get_mean_returns, convert_to_date
 from optimisers import maximise_sharpe, minimise_vol, efficient_portfolio, maximise_returns
-from data_loader import download_data
-from FactorAnalysis import FactorAnalysis
 
 TRADING_DAYS = 252
 
@@ -17,72 +26,90 @@ class StockUniverse():
     Attributes
     ----------
     stocks : list(str)
-        List of tickers of stocks in the stock universe
+        List of tickers of stocks in the stock universe.
     start_date : datetime
-        Start date of stock universe (important for getting data)
+        Start date of stock universe (important for getting data).
     end_date : datetime
-        End date of stock universe (important for getting data)
+        End date of stock universe (important for getting data).
     stock_data: pd.DataFrame
-        Stock data
+        Stock data.
     bonds_data: pd.DataFrame
-        3-months T-Bill data
+        3-months T-Bill data.
     mean_returns : np.array
-        Mean returns of stocks
+        Mean returns of stocks.
     cov_matrix : np.array
-        Covariance matrix
+        Covariance matrix.
     risk_free_rate : float
-        Risk free rate
+        Risk free rate.
     max_sharpe_portfolio : Portfolio
-        Max Sharpe Ratio Portfolio
+        Max Sharpe Ratio Portfolio.
     min_vol_portfolio : Portfolio
-        Min Vol Portfolio
+        Min Vol Portfolio.
     min_returns : float
-        Minimum annualised returns achievable by a portfolio in the universe
+        Minimum annualised returns achievable by a portfolio in the universe.
     max_returns : float
-        Maximum annualised returns achievable by a portfolio in the universe
+        Maximum annualised returns achievable by a portfolio in the universe.
     min_vol : float
-        Minimum annualised volatility achievable by a portfolio in the universe
+        Minimum annualised volatility achievable by a portfolio in the universe.
     max_vol : float
-        Maximum annualised volatility achievable by a portfolio in the universe
+        Maximum annualised volatility achievable by a portfolio in the universe.
+    factor_analysis : Factor_Analysis.Factor_Analysis
+        Factor analysis run on the stock universe.
         
     Methods
     -------
     update_min_max():
-        Computes the possible annualised min and max returns and volatility achievable in stock universe.
-        Updates attributes directly.
+        Compute the possible annualised min and max returns and volatility achievable in stock universe.
+        Update attributes directly.
         
     optimise_portfolio(optimiser, target):
-        Finds the best weights in a portfolio in order to reach the target vol or excess returns,
+        Find the best weights in a portfolio in order to reach the target vol or excess returns,
         as specified by optimiser.
-        Returns the optimised portfolio.
+        Return the optimised portfolio.
     
     get_data():
-        Downloads stock and 3-months T-Bill data.
-        Returns the tickers of stocks that could not be downloaded.
+        Download stock and 3-months T-Bill data.
+        Return the tickers of stocks that could not be downloaded.
     
     calc_mean_returns_cov():
-        Calculates the mean returns and covariance matrix from stock data.
-        Updates mean_returns and cov_matrix, risk-free-rate, calculates max sharpe portfolio, 
+        Calculate the mean returns and covariance matrix from stock data.
+        Update mean_returns and cov_matrix, risk-free-rate, calculates max sharpe portfolio, 
         min vol portfolio and updates min/max returns/vol.
     
     calc_risk_free_rate():
-        Calculates the risk-free-rate from bonds data. Updates attribute.
+        Calculate the risk-free-rate from bonds data. Updates attribute.
+        
+    get_covariance_matrix(cov_type = 'sample_cov'):
+        Get the covariance matrix corresponding to specified estimation method. Returns covariance matrix.
     
     individual_stock_portfolios():
-        Calculates the annualised excess returns and volatility of the individual stocks in the universe.
-        Returns vol and excess returns.
+        Calculate the annualised excess returns and volatility of the individual stocks in the universe.
+        Return vol and excess returns.
     
     calc_max_sharpe_portfolio():
-        Calculates the maximum Sharpe Ratio portfolio. Updates attributes directly. Returns None.
+        Calculate the maximum Sharpe Ratio portfolio. Returns the max Sharpe portfolio.
         
     calc_min_vol_portfolio():
-        Calculates the minimum volatility portfolio. Updates attributes directly. Returns None.
+        Calculate the minimum volatility portfolio. Returns the min vol portfoliol.
         
     calc_efficient_frontier(constraint_set = (0,1)):
-        Calculates portfolios along the efficient frontier for various values of target excess return.
-        Returns the efficient portfolios' vols and excess returns.
+        Calculate portfolios along the efficient frontier for various values of target excess return,
+        and keeps track of max Sharpe portfolio found. 
+        Return the efficient portfolios' vols and excess returns and the max Sharpe portfolio found along the way.
+        
+    run_factor_analysis(factor_returns):
+        Run a factor analysis on the stock universe.
+        Save the corresponding attribute.
+        
+    get_factor_betas(factor = None):
+        Return the beta of each stock corresponding to the factor, or to all factors if None is passed.
+        
+    calc_factor_ranges():
+        Calculate the min/max betas for each factor amongst all the stocks in the universe.
+        Return these as a pd.DataFrame with min/max columns and rows indexed by the factors.
     
     """
+    
     def __init__(self, 
                  stocks, 
                  start_date = dt.datetime.today() + relativedelta(years = -1), 
@@ -91,7 +118,7 @@ class StockUniverse():
                  cov_matrix = None,
                  risk_free_rate = None):
         """
-        Constructs the attributes of the stock universe object.
+        Construct the attributes of the stock universe object.
 
         Parameters
         ----------
@@ -101,10 +128,15 @@ class StockUniverse():
             Start date of universe to be considered. The default is 1 year ago.
         end_date : datetime, optional
             End date of universe to be considered. The default is today.
-        mean_returns : np.array, optional
-            Mean returns of the stock universe. Typically will be downloaded and computed in-class, but can 
+        mean_returns : pd.Series, optional
+                      Index : Asset tickers (str)
+                      Values : Daily mean returns (float)
+            Daily mean returns of the stock universe. Typically will be downloaded and computed in-class, but can 
             optionally be passed directly. The default is None.
-        cov_matrix : np.array, optional
+        cov_matrix : pd.DataFrame, optional
+                        Index : Asset tickers (str)
+                        Columns : Asset tickers (str)
+                        Values : Covariance (of daily mean returns) between assets (float)
             Covariance matrix of the stock universe. Typically will be downloaded and computed in-class, but can 
             optionally be passed directly. The default is None.
         risk_free_rate : float, optional
@@ -135,8 +167,8 @@ class StockUniverse():
         
     def update_min_max(self):
         """
-        Calculates the minimum and maximum achievable annualised excess returns and volatility by portfolios
-        in the stock universe. Will set the risk free rate from bonds data, if no risk free rate has been set yet.
+        Calculate the minimum and maximum achievable annualised excess returns and volatility by portfolios
+        in the stock universe. Set the risk free rate from bonds data, if no risk free rate has been set yet.
 
         Returns
         -------
@@ -155,8 +187,8 @@ class StockUniverse():
     
     def optimise_portfolio(self, optimiser, target, cov_type = 'sample_cov', factor_bounds = None):
         """
-        Finds the best weights in a portfolio in order to reach the target vol or excess returns,
-        as specified by optimiser.
+        Find the optimal weights in a portfolio in order to reach the target excess returns and minimise vol
+        or maximise returns whilst volatility below a target, as specified by optimiser.
 
         Parameters
         ----------
@@ -164,6 +196,10 @@ class StockUniverse():
             Describes how we want to optimise: by minimising volatility or maximising returns.
         target : float
             The target we want the portfolio to achieve, as specified by optimised, i.e. the excess returns or volatility.
+        cov_type : str, optional
+            Estimation method for the covariance matrix. Default is 'sample_cov'.
+        factor_bounds: dict, optional
+            Dictionary of factor constraints with lower and upper bounds. Default is None.
 
         Returns
         -------
@@ -172,7 +208,6 @@ class StockUniverse():
 
         """
         
-        
         optimised_portfolio = Portfolio(self)
         
         if optimiser == 'min_vol':
@@ -180,13 +215,11 @@ class StockUniverse():
                 optimised_portfolio = efficient_portfolio(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
             except Exception as e:
                 raise ValueError(str(e))
-                print(f"Portfolio optimisation problem: {str(e)}")
         else:
             try:
                 optimised_portfolio = maximise_returns(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
             except Exception as e:
                 raise ValueError(str(e))
-                print(f"Portfolio optimisation problem: {str(e)}")
             
         return optimised_portfolio
     
@@ -230,7 +263,7 @@ class StockUniverse():
         """
         Compute mean returns and covariance matrix of stock universe from the (downloaded) stock data.
         Will set the risk-free-rate from downloaded bonds data if it has not yet been set.
-        Calculate the max Sharpe Ratio and min vol portfolios and upadte the min/max excess returns/vol.
+        Calculate the max Sharpe Ratio and min vol portfolios and update the min/max excess returns/vol.
         Update all these attributes.
 
         Returns
@@ -262,6 +295,7 @@ class StockUniverse():
         None.
 
         """
+        
         if len(self.bonds_data) == 0:
             self.risk_free_rate = 0
             
@@ -269,6 +303,25 @@ class StockUniverse():
         self.risk_free_rate = get_mean_returns(R_F_annual)
         
     def get_covariance_matrix(self, cov_type = 'sample_cov'):
+        """
+        Get the covariance matrix estimated using a specific method.
+
+        Parameters
+        ----------
+        cov_type : {'sample_cov', 'factor_cov'}
+            Estimation method for the covariance matrix. The default is 'sample_cov'.
+
+        Returns
+        -------
+        pd.DataFrame
+            Index : Asset tickers (str)
+            Columns : Asset tickers (str)
+            Values : Covariance between assets (float)
+            
+            Covariance matrix.
+
+        """
+        
         if cov_type == 'factor_cov' and self.factor_analysis is not None:
             return self.factor_analysis.stock_cov_matrix
         else:
@@ -277,6 +330,11 @@ class StockUniverse():
     def individual_stock_portfolios(self, cov_type = 'sample_cov'):
         """
         Calculate the annualised excess returns and volatility of individual stocks in the stock portfolio.
+        
+        Parameters
+        ----------
+        cov_type : str, optional
+            Estimation method for the covariance matrix. Default is 'sample_cov'.
         
         Returns
         -------
@@ -297,11 +355,12 @@ class StockUniverse():
     
     def calc_max_sharpe_portfolio(self):
         """
-        Calculate the max Sharpe Ratio portfolio, and update the relevant attribute.
+        Calculate the max Sharpe Ratio portfolio.
 
         Returns
         -------
-        None.
+        max_sharpe_portfolio : Portfolio
+            The max Sharpe Ratio portfolio.
 
         """
         
@@ -311,11 +370,12 @@ class StockUniverse():
         
     def calc_min_vol_portfolio(self):
         """
-        Calculate the minimum volatility portfolio, and update the relevant attribute.
+        Calculate the minimum volatility portfolio.
 
         Returns
         -------
-        None.
+        min_vol_portfolio : Portfolio
+            The mininimum volatility portfolio.
 
         """
         
@@ -326,18 +386,21 @@ class StockUniverse():
     def calc_efficient_frontier(self, cov_type = 'sample_cov', constraint_set = (0, 1)):
         """
         Calculate the portfolios along the efficient frontier for various values of target excess return.
+        Calculate the max Sharpe portfolio along the way, update the attribute and return it.
 
         Parameters
         ----------
-        constraint_set : list(float, float), optional
+        cov_type : str, optional
+            Estimation method for the covariance matrix. Default is 'sample_cov'.
+        constraint_set : array_like(float, float), optional
             Allowed min and max of weights. The default is (0, 1).
 
         Returns
         -------
-        efficient_frontier_vols : list(float)
-            List of volatilities of efficient portfolios (i.e. minimising vol) for given target excess returns.
-        target_excess_returns : list(float)
-            List of target excess returns that we want the portfolios to reach.
+        efficient_frontier_data : tuple(list(float), list(float))
+            Tuple containing the list of volatilities and excess returnns of efficient portfolios (i.e. minimising vol given returns).
+        cur_max_sharpe_portfolio : Portfolio
+            The max Sharpe Portfolio found from the efficient frontier.
 
         """
         
@@ -349,46 +412,83 @@ class StockUniverse():
         target_excess_returns = np.linspace(LOWER, UPPER, 500)
         efficient_frontier_vols = []
         efficient_frontier_returns = []
-        # prev_vol = None
+
         for target in target_excess_returns:
-            # for each efficient portfolio, obtain the portfolio volatility
             eff_portfolio = Portfolio(self)
             try:
                 eff_portfolio = efficient_portfolio(eff_portfolio, target, cov_type = cov_type)
                 efficient_frontier_vols.append(eff_portfolio.vol)
                 efficient_frontier_returns.append(eff_portfolio.excess_returns)
-                # if prev_vol and eff_portfolio.vol == prev_vol:
-                #     print(eff_portfolio.excess_returns, eff_portfolio.vol)
-                # prev_vol = eff_portfolio.vol
+                
                 if cur_max_sharpe_portfolio and cur_max_sharpe_portfolio.sharpe_ratio < eff_portfolio.sharpe_ratio:
                      cur_max_sharpe_portfolio = eff_portfolio
                      cur_max_sharpe_portfolio.name = 'Max Sharpe'
             except:
                 continue
-                # efficient_frontier_vols.append(None)
-                # efficient_frontier_returns.append(None)
                 
         if cov_type == 'sample_cov':
             self.max_sharpe_portfolio = cur_max_sharpe_portfolio
+            
+        efficient_frontier_data = (efficient_frontier_vols, efficient_frontier_returns)
         
-        return (efficient_frontier_vols, efficient_frontier_returns), cur_max_sharpe_portfolio
+        return efficient_frontier_data, cur_max_sharpe_portfolio
             
     def run_factor_analysis(self, factor_returns):
+        """
+        Run a factor analysis on the stock universe.
+
+        Parameters
+        ----------
+        factor_returns : pd.DataFrame
+            Factor returns of the model to be used.
+                Index: Date (pd.Timestamp, datetime)
+                Columns: Factor (str), must include 'RF' for risk-free-rate to be used
+                Values: Daily simple returns in basis points (float).
+
+        Returns
+        -------
+        None.
+
+        """
+        
         self.factor_analysis = FactorAnalysis(self, factor_returns)
         
         return None
     
     def get_factor_betas(self, factor = None):
+        """
+        Get the factor betas for each stock in the universe.
+
+        Parameters
+        ----------
+        factor : str, optional
+            Factor whose beta is to be returned. If None, then return all factor betas. The default is None.
+
+        Raises
+        ------
+        ValueError
+            If factor analysis has not yet been set for the universe or the factor passed is not found in the factor model.
+
+        Returns
+        -------
+        pd.Series, pd.DataFrame
+            Index: 
+                stock ticker (str)
+            Columns:  
+                factor (str)
+            
+            The beta of all stocks with respect to a factor or all factors.
+
+        """
+        
         if self.factor_analysis is None:
             raise ValueError("Factor analysis has not been set for this universe.")
         
         factor_exposures = self.factor_analysis.get_factor_exposures()
         
         if factor is None:
-            # Return all factor betas
             return factor_exposures
         elif factor in factor_exposures.columns:
-            # Return betas of a specific factor
             return factor_exposures[factor]
         else:
             raise ValueError(f"Factor '{factor}' not found in the factor analysis.")
@@ -396,6 +496,22 @@ class StockUniverse():
         return None
     
     def calc_factor_ranges(self):
+        """
+        Calculate the min/max betas for each factor amongst all the stocks in the universe.
+
+        Returns
+        -------
+        pd.DataFrame
+            Index:
+                factor, str.
+            Columns:
+                'min': minimum beta, float
+                'max': max_beta, float
+                
+            The min anx max beta for each factor.
+
+        """
+        
         factor_betas = self.get_factor_betas()
         min_betas = factor_betas.min()
         max_betas = factor_betas.max()
@@ -408,7 +524,7 @@ class Portfolio():
     
     Attributes
     ----------
-    universe : StockUniverse
+    universe : StockUniverse.StockUniverse
         Stock universe containing the stocks of the portfolio.
     name: str
         Name of portfolio.
@@ -421,34 +537,34 @@ class Portfolio():
     weights: np.array
         Weights of the portfolio's stocks.
     sharpe_ratio: float
-        Sharpe Ratio of the portfolio
+        Annualised Sharpe Ratio of the portfolio.
         
     Methods
     -------
     normalise_weights():
-        Normalises weights so they add up to 1. Updates attribute directly.
+        Normalise weights so they add up to 1. Update attribute directly.
         
-    calc_performance():
-        Computes the portfolio's annualised returns, excess returns, volatility and sharpe ratio from the StockUniverse 
-        mean returns and covariance matrix. If the relevant stock data, does not exist, all these quantities are
-        saved as 0. Saves attributes directly.
+    calc_performance(cov_type = 'sample_cov'):
+        Compute the portfolio's annualised returns, excess returns, volatility and sharpe ratio from the Stock Universe 
+        mean returns and covariance matrix (using the estimation method 'cov_type').  If the relevant stock data does 
+        not exist, save all these quantities as 0. Save attributes directly.
         
     get_performance_df():
-        Creates a pd.DataFrame of the excess returns, volatility and sharpe ratio.
+        Create a pd.DataFrame of the excess returns, volatility and sharpe ratio.
         
     get_weights_df():
-        Creates a pd.DataFrame of the weights of the portfolio.
+        Create a pd.DataFrame of the weights of the portfolio.
         
     """
     
     def __init__(self, universe, name = "", weights = []):
         """
-        Constructs the attributes of the portfolio object. If no weights are passed, the portfolio will be
-        instantiated with uniform weights.
+        Construct the attributes of the portfolio object. If no weights are passed, instantiate the portfolio
+        with uniform weights.
 
         Parameters
         ----------
-        universe : StockUniverse
+        universe : StockUniverse.StockUniverse
             Stock universe of the portfolio's stocks.
         name : str, optional
             Name of the portfolio, used for print out purposes. The default is "".
@@ -477,7 +593,7 @@ class Portfolio():
         
     def normalise_weights(self):
         """
-        Normalises weights so they add up to 1. Updates attribute directly.
+        Normalise weights so they add up to 1. Update attribute directly.
 
         Returns
         -------
@@ -489,7 +605,12 @@ class Portfolio():
     
     def calc_performance(self, cov_type = 'sample_cov'):
         """
-        Compute portfolio performance: annualised return, excess return, volatility and Sharpe Ratio.
+        Compute portfolio performance with respect to an estimated covariance matrix: annualised return, excess return, volatility and Sharpe Ratio.
+        
+        Parameters
+        ----------
+        cov_type : str, optional
+            Estimation method for the covariance matrix. Default is 'sample_cov'.
 
         Returns
         -------
@@ -518,11 +639,17 @@ class Portfolio():
     
     def get_performance_df(self):
         """
-        Creates a pd.DataFrame of the excess returns, volatility and sharpe ratio.
+        Create a pd.DataFrame of the excess returns, volatility and sharpe ratio.
 
         Returns
         -------
         results_df : pd.DataFrame
+                Index: 
+                    Portfolio name (str)
+                Columns:
+                    'Excess Returns': annualised excess returns (float)
+                    'Volatility': annualised volatility (float)
+                    'Sharpe Ratio': annualised Sharpe Ratio (float)
             Dataframe containing the excess returns, volatility and sharpe ratio.
         format_map : dict
             Dictionary that maps the outputs into a nice format for display.
@@ -543,16 +670,23 @@ class Portfolio():
     
     def get_weights_df(self):
         """
-        Creates a pd.DataFrame of the weights of the portfolio.
+        Create a pd.DataFrame of the weights of the portfolio.
 
         Returns
         -------
         weights_df : pd.DataFrame
             Dataframe containing the weights of the portfolio's stocks.
+                Index: 
+                    Portfolio name (str)
+                Columns: 
+                    Asset tickers (str)
+                Values: 
+                    Weight of asset in portfolio (float)
         format_map : dict
-            Dictionary that maps the outputs into a nice format for display..
+            Dictionary that maps the outputs into a nice format for display.
 
         """
+        
         weights = {self.universe.stocks[idx]: self.weights[idx] for idx in range(len(self.universe.stocks))}
         
         weights_df = pd.DataFrame(weights, index = [self.name + ' Portfolio'])
@@ -560,6 +694,3 @@ class Portfolio():
         format_map = {col: "{:,.0%}".format for col in weights_df.columns}
         
         return weights_df, format_map
-    
-    def is_equally_weighted(self, tolerance = 1e-4):
-        return np.allclose(self.weights, self.weights[0], rtol = 0, atol = tolerance)

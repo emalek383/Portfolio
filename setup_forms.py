@@ -1,10 +1,10 @@
 import streamlit as st
 import datetime as dt
 from dateutil.relativedelta import relativedelta
-from process_forms import process_stock_form, recompute_portfolio, optimise_custom_portfolio, process_factor_analysis_form, clear_factor_analysis, impose_factor_constraints, clear_ranges, update_covariance_choice
-from helper_functions import get_default_factor_bounds, format_factor_choice, format_covariance_choice, COV_METHODS, COV_METHOD_MAP
 
-DEFAULT_STOCKS = "GOOG, NVDA"
+from process_forms import process_stock_form, recompute_portfolio, optimise_custom_portfolio, process_factor_analysis_form, clear_factor_analysis, impose_factor_constraints, clear_ranges, update_covariance_choice
+from helper_functions import get_default_factor_bounds, format_factor_choice, format_covariance_choice, COV_METHODS
+
 DEFAULT_STOCKS = "GOOG, NVDA, LLY, MRK, MSFT, AAPL, AMZN, TSLA, NFLX, ADBE, UBS, JPM, XOM, GS, BRK-B, A, AMD, MMM, AOS, AES, AFL, APD, ABNB, LNT, ALLE, ARE, A, AMCR, AEE, AEP, AMT, AWK"
 now = dt.datetime.today()
 DEFAULT_START = now + relativedelta(years = -1)
@@ -68,12 +68,12 @@ def setup_weights_form(form, cols_per_row = 6):
 
     Parameters
     ----------
-    form : st.form
+    form : st.container
         Will become the weights selection form.
 
     Returns
     -------
-    form : st.form
+    form : st.container
         Weights selection form.
 
     """
@@ -95,7 +95,7 @@ def ask_for_weights(weights_form, default_weights, cols_per_row = 6):
 
     Parameters
     ----------
-    weights_form : st.form
+    weights_form : st.container
         Form where the weights input boxes will be displayed.
     default_weights : list(float)
         Default weights to populte the weights input boxes with.
@@ -124,7 +124,22 @@ def ask_for_weights(weights_form, default_weights, cols_per_row = 6):
             
     return weights      
 
-def setup_factor_analysis_form(form):    
+def setup_factor_analysis_form(form):  
+    """
+    Create the form to allow the user to choose a factor model for a factor analysis or clear the current factor model.
+
+    Parameters
+    ----------
+    form : st.form
+        Will become the form.
+
+    Returns
+    -------
+    form : st.form
+        The completed form.
+
+    """
+    
     if not state.universe or len(state.universe.stocks) < 2:
         return form
     
@@ -133,13 +148,25 @@ def setup_factor_analysis_form(form):
                               format_func = format_factor_choice,
                               )
     
-    #col1, col2 = form.columns(2)
-    #with col1:
     st.button(label = "Run Factor Model", on_click = process_factor_analysis_form, args = (factor_model, ) )
-    #with col2:
     st.button(label = "Clear Factor Model", on_click = clear_factor_analysis)
     
 def setup_covariance_form(form):
+    """
+    Create the form to allow the user to choose how to estimate the covariance matrix. Current options: Sample Covariance and Factor-based Covariance.
+
+    Parameters
+    ----------
+    form : st.container
+        Will become the form.
+
+    Returns
+    -------
+    form : st.container
+        The completed form.
+
+    """
+    
     if not state.universe or len(state.universe.stocks) < 2 or not state.factor_model:
         return form
     
@@ -157,17 +184,18 @@ def setup_covariance_form(form):
 
 def setup_optimise_portfolio_form(form):
     """
-    Setup the form, allowing a user to optimise their portfolio by minimising volatility, given a target return,
-    or maximising the return, given a fixed volatility.
+    Setup the form, allowing a user to optimise their portfolio by minimising volatility given a target return,
+    or maximising the return given an upper volatility bound. The user can use constraints on the factor exposures,
+    if they wish to.
 
     Parameters
     ----------
-    form : st.form
+    form : st.container
         Form that will become optimise portfolio form.
 
     Returns
     -------
-    form : st.form
+    form : st.container
         Optimise portfolio form.
 
     """
@@ -212,45 +240,54 @@ def setup_optimise_portfolio_form(form):
     use_factor_constraints = form.checkbox(label = "Include factor constraints", disabled = disabled_checkbox, help = "Imposing constraints on factor exposure is only possible after a factor analysis has been run.")
     if use_factor_constraints:
         factor_bounds = state.factor_bounds
-            
-    print(f"Passing factor bounds: {factor_bounds}")
-    
-    form.button(label = "Optimise", on_click = optimise_custom_portfolio, args = (form, chosen_optimiser, target, state.factor_model, factor_bounds) )
+                
+    form.button(label = "Optimise", on_click = optimise_custom_portfolio, args = (form, chosen_optimiser, target, factor_bounds) )
     
     return form
 
-def extract_factor_ranges(factor_list, factor_bounds_values):
-        
-    factor_bounds = {}
-    factor_ranges = get_default_factor_bounds(state.universe)
-    print(f"Default factor ranges: {factor_ranges}")
-    for idx, factor in enumerate(factor_list):
-        factor_bounds_values[idx] = list(factor_bounds_values[idx])
-        if factor_bounds_values[idx] == list(factor_ranges[factor]):
-            continue
-        else:
-            if factor_bounds_values[idx][0] == factor_ranges[factor][0]:
-                factor_bounds_values[idx][0] = None
-            if factor_bounds_values[idx][1] == factor_ranges[factor][1]:
-                factor_bounds_values[idx][1] = None
-        
-        factor_bounds[factor] = factor_bounds_values[idx]
-        
-    return factor_bounds
-
 def setup_factor_constraints_form(form, factor_model):
-    print("\n Setting up factor constraints form")
-    factor_list, factor_bounds_values = setup_factor_bounds(form, factor_model)
-    print(f"Factor list: {factor_list}")
-    print(f"Factor bounds values: {factor_bounds_values}")
-    
-    form.button(label = "Impose Constraints", on_click = impose_factor_constraints, args = (factor_model, factor_list, factor_bounds_values))
-    form.button(label = "Clear Constraints", on_click = clear_ranges)
-    
-    # form.form_submit_button(label = "Impose Constraints", on_click = impose_factor_constraints, args = (factor_model, factor_list, factor_bounds_values))
-    # form.form_submit_button(label = "Clear Constraints", on_click = clear_ranges)
+    """
+    Create the form to choose constraints on the factor exposure or to clear all constraints.
 
-def setup_factor_bounds(form, factor_model):
+    Parameters
+    ----------
+    form : st.container
+        Form for choosing the constraints on the exposure.
+    factor_model : str
+        Factor model chosen.
+
+    Returns
+    -------
+    None.
+
+    """
+    factor_list, factor_bounds_values = setup_factor_bounds_sliders(form, factor_model)
+    
+    form.button(label = "Impose Constraints", on_click = impose_factor_constraints, args = (factor_list, factor_bounds_values))
+    form.button(label = "Clear Constraints", on_click = clear_ranges)
+
+
+def setup_factor_bounds_sliders(form, factor_model):
+    """
+    Create one double-ended slider per factor for the user to choose the constraints on the factor exposure.
+    Default values for the sliders are the previously set constraints on factor exposures.
+
+    Parameters
+    ----------
+    form : st.container
+        Form for choosing the constraints on the exposure.
+    factor_model : str
+        Chosen factor model, currently supporting ['ff3', 'ff4', 'ff5', 'ff6'] (Fama-French 3, 3 + Momentum, 5, 5 + Momentum) models.
+
+    Returns
+    -------
+    dict
+        Dictionary with key: value = factor model: [list of factors of the model].
+    new_factor_bounds : list(st.slider)
+        List of sliders, one for each factor.
+
+    """
+    
     factor_map = {'ff3': ['Mkt-RF', 'SMB', 'HML']}
     factor_map['ff4'] = factor_map['ff3'] + ['Mom']
     factor_map['ff5'] = factor_map['ff3'] + ['RMW', 'CMA']
@@ -269,7 +306,7 @@ def setup_factor_bounds(form, factor_model):
             if upper:
                 default_value[1] = upper
             
-        new_factor_bounds.append(form.slider(label = factor, #f"Allowed exposure on {factor}",
+        new_factor_bounds.append(form.slider(label = factor,
                                          value = default_value,
                                          min_value = factor_ranges[factor][0],
                                          max_value = factor_ranges[factor][1],

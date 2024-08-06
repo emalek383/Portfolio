@@ -1,6 +1,14 @@
+"""
+Miscellaneous functions support other modules.
+
+"""
+
+
 import numpy as np
 import pandas as pd
 from datetime import datetime
+
+TRADING_DAYS = 252
 
 COV_METHODS = [
     {
@@ -17,19 +25,62 @@ COV_METHODS = [
 
 COV_METHOD_MAP = {method['id']: method for method in COV_METHODS}
 
+def calculate_factor_contributions(portfolio, factor_exposures):
+    """
+    Calculate the returns contributions of factors for a portfolio.
 
-def format_covariance_choice(cov_type):
-    return COV_METHOD_MAP[cov_type]['name']
+    Parameters
+    ----------
+    portfolio : StockUniverse.Portfolio
+        Portfolio to be analysed.
+    factor_exposures : pd.Series
+        Exposure to the factors.
+        Index: factor (str)
+        Value: beta of that factor (float).
 
-def convert_to_date(date):
-    if isinstance(date, pd.Timestamp):
-        date = date.to_pydatetime()
+    Returns
+    -------
+    contributions : dict
+        Dictionary containing the returns contributions of the factors.
+        Key: factor name (str)
+        Value: returns contribution (float).
+
+    """
     
-    date = datetime.date(date)
+    factor_returns = portfolio.universe.factor_analysis.factor_returns / 100
+    factor_returns = factor_returns.loc[portfolio.universe.start_date : portfolio.universe.end_date]
+    factor_returns = get_mean_returns(factor_returns) * TRADING_DAYS
     
-    return date
+    total_return = portfolio.excess_returns
+    
+    contributions = {}
+    for factor, exposure in factor_exposures.items():
+        factor_contribution = exposure * factor_returns[factor]
+        contributions[factor] = (factor_contribution / total_return) * 100
+    
+    explained_return = sum(contributions.values())
+    contributions['Residual'] = 100 - explained_return
+    
+    return contributions
 
 def get_default_factor_bounds(universe):
+    """
+    Get the default factor exposure ranges for a stock universe, i.e. the min and max beta for each factor in the universe.
+
+    Parameters
+    ----------
+    universe : StockUniverse.StockUniverse
+        Stock Universe to be studied.
+
+    Returns
+    -------
+    default_bounds : dict
+        Dictionary containing lowest and highest beta for each factor in the universe.
+        Key: factor name (str)
+        Value: minimum beta, maximum beta (tuple(float, float))
+
+    """
+    
     ranges = universe.calc_factor_ranges()
     default_bounds = {}
     for factor in ranges.index:
@@ -40,8 +91,28 @@ def get_default_factor_bounds(universe):
         
     return default_bounds
 
-
 def portfolio_satisfies_constraints(portfolio, factor_bounds):
+    """
+    Check whether a portfolio satisfies constraints on factor exposure.
+
+    Parameters
+    ----------
+    portfolio : StockUniverse.Portfolio
+        Portfolio to be studied.
+    factor_bounds : dict
+        Dictionary containing the constraints on factor exposures as:
+        Key: Factor name (str)
+        Value: [lower constraint, upper constraint] (tuple(float, float))
+                with lower/upper constraint = None indicating no constraint
+        If no constraint at all on factor, it won't appear in the dictionary.
+
+    Returns
+    -------
+    bool
+        True if the portfolio satisfies the constraints, False otherwise.
+
+    """
+    
     for factor, (lower, upper) in factor_bounds.items():
         factor_betas = portfolio.universe.get_factor_betas(factor).values
         weights = portfolio.weights
@@ -53,9 +124,66 @@ def portfolio_satisfies_constraints(portfolio, factor_bounds):
     return True
 
 def format_factor_choice(option):
+    """
+    Format the choice of factor model to plain English.
+
+    Parameters
+    ----------
+    option : str
+        Short name of  factor model.
+
+    Returns
+    -------
+    str
+        Plain English name for the factor model.
+
+    """
+    
     format_map = {'ff3': 'Fama-French 3-Factor', 'ff4': 'Fama-French 3-Factor + Momentum', 'ff5': 'Fama-French 5-Factor', 'ff6': 'Fama-French 5-Factor + Momentum'}
     return format_map[option]
 
+
+
+def format_covariance_choice(cov_type):
+    """
+    Format the covariance estimation method to plain English.
+
+    Parameters
+    ----------
+    cov_type : str
+        Short name of the covariance estimation method.
+
+    Returns
+    -------
+    str
+        Plain English name of the covariance estimation method.
+
+    """
+    
+    return COV_METHOD_MAP[cov_type]['name']
+
+def convert_to_date(date):
+    """
+    Convert a timestamp or datetime time to a datetime date.
+
+    Parameters
+    ----------
+    date : pd.Timestamp, datetime time.
+        Timestamp to be converted to a date.
+
+    Returns
+    -------
+    date : datetime.date
+        Date of the timestamp.
+
+    """
+    
+    if isinstance(date, pd.Timestamp):
+        date = date.to_pydatetime()
+    
+    date = datetime.date(date)
+    
+    return date
 
 def get_mean_returns(returns):
     """
@@ -78,88 +206,27 @@ def get_mean_returns(returns):
     mean_returns = np.exp(mean_log_returns) - 1
     return mean_returns
 
-def portfolio_excess_returns(weights, portfolio):
+def same_weights(weights1, weights2, threshold=1e-3):
     """
-    Compute the excess returns of a portfolio with given weights.
+    Check whether two weight vectors are the same up to a numerical threshold.
 
     Parameters
     ----------
-    weights : list(float)
-        List of weights to be used for the portfolio.
-    portfolio : Portfolio
-        Portfolio whose excess returns will be computed.
+    weights1, weights2 : array-like
+        The weights vectors.
+    threshold : float, optional
+        Numerical threshold for equality. The default is 1e-3.
 
     Returns
     -------
-    portfolio.excess_returns: float
-        Excess returns of the portfolio.
+    bool
+        True if the two weights vectors are the same, otherwise False.
 
     """
     
-    portfolio.weights = weights
-    portfolio.calc_performance()
-    return portfolio.excess_returns
-
-def portfolio_vol(weights, portfolio):
-    """
-    Compute the volatility of a portfolio with given weights.
-
-    Parameters
-    ----------
-    weights : list(float)
-        List of weights to be used for the portfolio.
-    portfolio : Portfolio
-        Portfolio whose volatility will be computed.
-
-    Returns
-    -------
-    portfolio.vol: float
-        Volatility of the portfolio.
-
-    """
+    if len(weights1) != len(weights2):
+        return False
     
-    portfolio.weights = weights
-    portfolio.calc_performance()
-    return portfolio.vol
-
-def negative_SR(weights, portfolio):
-    """
-    Compute the negative Sharpe Ratio of a portfolio with given weights.
-
-    Parameters
-    ----------
-    weights : list(float)
-        List of weights to be used for the portfolio.
-    portfolio : Portfolio
-        Portfolio whose negative Sharpe Ratio we want to compute.
-
-    Returns
-    -------
-    float
-        The negative Sharpe Ratio of the portfolio.
-
-    """
+    weights_diff = np.abs(weights1 - weights2)
     
-    portfolio.weights = weights
-    portfolio.calc_performance()
-    return - portfolio.sharpe_ratio
-
-def negative_portfolio_excess_returns(weights, portfolio):
-    """
-    Compute the negative excess returns of a portfolio with given weights.
-
-    Parameters
-    ----------
-    weights : list(float)
-        List of weights to be used for the portfolio.
-    portfolio : Portfolio
-        Portfolio whose negative excess returns will be computed.
-
-    Returns
-    -------
-    float
-        The portfolio's negative excess returns.
-
-    """
-    
-    return - portfolio_excess_returns(weights, portfolio)
+    return np.all(weights_diff < threshold)
