@@ -73,8 +73,8 @@ class StockUniverse():
     
     calc_mean_returns_cov():
         Calculate the mean returns and covariance matrix from stock data.
-        Update mean_returns and cov_matrix, risk-free-rate, calculates max sharpe portfolio, 
-        min vol portfolio and updates min/max returns/vol.
+        Update `mean_returns` and `cov_matrix`, risk-free-rate, calculate max sharpe portfolio, 
+        min vol portfolio and update min/max returns/vol.
     
     calc_risk_free_rate():
         Calculate the risk-free-rate from bonds data. Updates attribute.
@@ -262,7 +262,7 @@ class StockUniverse():
     def calc_mean_returns_cov(self):
         """
         Compute mean returns and covariance matrix of stock universe from the (downloaded) stock data.
-        Will set the risk-free-rate from downloaded bonds data if it has not yet been set.
+        Set the risk-free-rate from downloaded bonds data if it has not yet been set.
         Calculate the max Sharpe Ratio and min vol portfolios and update the min/max excess returns/vol.
         Update all these attributes.
 
@@ -288,7 +288,7 @@ class StockUniverse():
                 
     def calc_risk_free_rate(self):
         """
-        Calculate the annualised risk free rate from the downloaded bonds data. Update the attribute self.risk_free_rate.
+        Calculate the annualised risk free rate from the downloaded bonds data. Update the attribute `self.risk_free_rate`.
 
         Returns
         -------
