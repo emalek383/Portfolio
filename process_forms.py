@@ -34,6 +34,8 @@ def update_covariance_choice(cov_type):
     custom_portfolio = get_portfolio('custom')
     custom_portfolio.calc_performance(cov_type = cov_type)
     update_portfolio('custom', custom_portfolio)
+    
+    st.success(f"Set estimation method for covariance matrix to {format_covariance_choice(cov_type)}.")
 
 def process_stock_form(stock_list = None, start_date = None, end_date = None, risk_free_rate = None):
     """
@@ -469,7 +471,7 @@ def vol_sweep(universe, factor_bounds, cov_type = 'sample_cov', constraint_set =
 def initialise_factor_covariance_matrix():
     """
     Initialise the factor-based estimate of the covariance matrix by computing the efficient frontier with it and 
-    saving the max sharpe and min vol portfolios in state.
+    saving the max sharpe and min vol portfolios in state. Update the estimation method to be factor based.
 
     Returns
     -------
@@ -492,3 +494,5 @@ def initialise_factor_covariance_matrix():
     factor_cov_min_vol = minimise_vol(portfolio, cov_type = 'factor_cov')
     factor_cov_min_vol.name = 'Min Vol'
     update_portfolio('min_vol', factor_cov_min_vol, cov_type = 'factor_cov')
+    
+    update_covariance_choice('factor_cov')
