@@ -8,7 +8,7 @@ from helper_functions import format_factor_choice
 state = st.session_state
 
 col1, col2 = st.columns(2)
-factor_analysis_form = col1.container(border = False)
+factor_analysis_form = col1.form('factor_analysis_form', border = False)
 
 setup_factor_analysis_form(factor_analysis_form)
 

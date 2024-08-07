@@ -148,12 +148,17 @@ def setup_factor_analysis_form(form):
                               format_func = format_factor_choice,
                               )
     
-    st.button(label = "Run Factor Model", on_click = process_factor_analysis_form, args = (factor_model, ) )
-    st.button(label = "Clear Factor Model", on_click = clear_factor_analysis)
+    submitted = form.form_submit_button("Run Factor Model")
+    if submitted:
+        process_factor_analysis_form(factor_model)
+    
+    if st.button(label = "Clear Factor Model"):
+        clear_factor_analysis()
     
 def setup_covariance_form(form):
     """
-    Create the form to allow the user to choose how to estimate the covariance matrix. Current options: Sample Covariance and Factor-based Covariance.
+    Create the form to allow the user to choose how to estimate the covariance matrix.
+    Current options: Sample Covariance and Factor-based Covariance.
 
     Parameters
     ----------
@@ -162,8 +167,7 @@ def setup_covariance_form(form):
 
     Returns
     -------
-    form : st.container
-        The completed form.
+    None.
 
     """
     
@@ -176,7 +180,8 @@ def setup_covariance_form(form):
                                  options = cov_type_options,
                                  index = cov_type_options.index(state.cov_type) if state.cov_type in cov_type_options else 0,
                                  help = "Choose the method for estimating the covariance matrix.",
-                                 format_func = format_covariance_choice
+                                 format_func = format_covariance_choice,
+                                 key = 'covariance_choice'
                                  )
     
     form.button(label = "Update covariance estimation method", on_click = update_covariance_choice, args = (covariance_choice, ))

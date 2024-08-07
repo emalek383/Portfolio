@@ -79,12 +79,21 @@ initialise_portfolio_state()
 if not state.loaded_stocks:
     process_stock_form()
     state.loaded_stocks = True
+    
+# For displaying info messages at the top of each page
+info_container = st.container(border = False)
 
 dashboard = st.Page("my_pages/dashboard.py", title = "Portfolio Analysis")
 optimisation = st.Page("my_pages/portfolio_optimisation.py", title = "Portfolio Optimisation")
 factor_analysis = st.Page("my_pages/factor_analysis.py", title = "Factor Analysis")
 pg = st.navigation([dashboard, optimisation, factor_analysis])
 pg.run()
+
+# Display info messages and clear
+if 'info_messages' in st.session_state:
+        for message in st.session_state.info_messages:
+            info_container.info(message)
+        st.session_state.info_messages = []
 
 load_css('styles/style.css')
 

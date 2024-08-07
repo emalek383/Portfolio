@@ -11,6 +11,24 @@ from helper_functions import convert_to_date, get_default_factor_bounds, portfol
 
 state = st.session_state
 
+def set_info_message(message):
+    """
+    Save info message into session_state.
+
+    Parameters
+    ----------
+    message : str
+        Info message to be saved into session_state (and later displayed).
+
+    Returns
+    -------
+    None.
+
+    """
+    if 'info_messages' not in st.session_state:
+        st.session_state.info_messages = []
+    st.session_state.info_messages.append(message)
+
 def update_covariance_choice(cov_type):
     """
     Update the choice of estimation method for the covariance matrix.
@@ -27,6 +45,8 @@ def update_covariance_choice(cov_type):
     None.
 
     """
+
+    print(f"Running update_covariance_choice with cov_type = {cov_type}")
     
     state.cov_type = cov_type
     
@@ -35,8 +55,8 @@ def update_covariance_choice(cov_type):
     custom_portfolio.calc_performance(cov_type = cov_type)
     update_portfolio('custom', custom_portfolio)
     
-    st.success(f"Set estimation method for covariance matrix to {format_covariance_choice(cov_type)}.")
-
+    set_info_message(f"Estimation method for covariance matrix has been set to {format_covariance_choice(cov_type)}")
+    
 def process_stock_form(stock_list = None, start_date = None, end_date = None, risk_free_rate = None):
     """
     Process the stock selection form by downloading stock data and setting up the stock universe,
@@ -333,14 +353,14 @@ def process_factor_analysis_form(factor_model):
     state.universe.run_factor_analysis(factor_df)
     state.factor_model = factor_model
     
-    initialise_factor_covariance_matrix()
-    
     factor_start_date, factor_end_date = state.universe.factor_analysis.get_date_range()
     date_range = factor_end_date - factor_start_date
     if factor_end_date < state.universe.end_date:
-        st.info(f"Note that the Fama-French factor data has a lag and only runs until {factor_end_date.strftime('%d/%m/%Y')}. The remaining days will not be used.")
+        set_info_message(f"Note that the Fama-French factor data has a lag and only runs until {factor_end_date.strftime('%d/%m/%Y')}. The remaining days will not be used.")
     if date_range.days < 230:
-        st.info(f"Note that the factor analysis only covers {date_range.days} days and may not be reliable!")
+        set_info_message(f"Note that the factor analysis only covers {date_range.days} days and may not be reliable!")
+        
+    initialise_factor_covariance_matrix()
     
 def clear_ranges():
     """
