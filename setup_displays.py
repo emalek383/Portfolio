@@ -194,7 +194,7 @@ def setup_interactive_efficient_frontier_display(display):
     vols, excess_returns = state.universe.individual_stock_portfolios(cov_type=state.cov_type)
     stock_data = (state.universe.stocks, vols, excess_returns)
     
-    fig = plot_interactive_efficient_frontier(eff_frontier_data, constrained_eff_frontier_data, sorted_portfolios = sorted_portfolios, stock_data = stock_data, is_mobile = is_mobile())
+    fig = plot_interactive_efficient_frontier(eff_frontier_data, constrained_eff_frontier_data = constrained_eff_frontier_data, sorted_portfolios = sorted_portfolios, stock_data = stock_data, is_mobile = is_mobile())
     
     st.plotly_chart(fig, use_container_width = True, config = {'responsive': True, 'displayModeBar': False,})
     

@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_javascript import st_javascript
 from user_agents import parse
 
-from portfolio_state_manager import initialise_portfolio_state, update_efficient_frontier
+from portfolio_state_manager import initialise_portfolio_state
 from setup_forms import setup_covariance_form
 from process_forms import process_stock_form
 
@@ -75,6 +75,11 @@ if 'cov_type' not in state:
 
 initialise_portfolio_state()
 
+# Load default stocks, if no stocks are loaded yet
+if not state.loaded_stocks:
+    process_stock_form()
+    state.loaded_stocks = True
+
 dashboard = st.Page("my_pages/dashboard.py", title = "Portfolio Analysis")
 optimisation = st.Page("my_pages/portfolio_optimisation.py", title = "Portfolio Optimisation")
 factor_analysis = st.Page("my_pages/factor_analysis.py", title = "Factor Analysis")
@@ -88,10 +93,3 @@ if state.factor_model:
     with st.sidebar:
         covariance_method_form = st.container(border = False)
         covariance_method = setup_covariance_form(covariance_method_form)
-
-# Load default stocks, if no stocks are loaded yet
-if not state.loaded_stocks:
-    process_stock_form()
-    state.loaded_stocks = True
-    if state.universe and len(state.universe.stocks) > 1:
-        update_efficient_frontier(state.universe.calc_efficient_frontier(), cov_type = 'sample_cov')
