@@ -1,8 +1,8 @@
 # Portfolio
 [Web app](https://www.emanuelmalek.com/quant_projects/portfolio_optimiser.html) for optimising portfolios using Modern Portfolio Theory, aka mean-variance optimisation, and Factor Analysis.
 
-## Functionalities: ##
-- Optimise portfolios in a stock basket, i.e.
+## Functionalities
+- Optimise long-only portfolios in a stock basket, i.e.
   - minimise volatility for a given excess return,
   or
   - maximise excess returns with volatility below a threshold.
@@ -22,3 +22,8 @@ The web app is built using streamlit. After pip installing streamlit, you can la
 ```
 streamlit run main.py
 ```
+
+## Future plans
+- Include constraints on the min/max allocations of portfolios.
+- Calculate additional risk measures, including VaR and CVaR.
+- Allow for beta hedging.
