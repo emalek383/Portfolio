@@ -1,4 +1,4 @@
-# Portfolio
+# Portfolio Optimisation and Factor Analysis
 [Web app](https://www.emanuelmalek.com/quant_projects/portfolio_optimiser.html) for optimising portfolios using Modern Portfolio Theory, aka mean-variance optimisation, and Factor Analysis.
 
 ## Functionalities
