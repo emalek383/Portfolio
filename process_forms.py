@@ -103,7 +103,7 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         for stock in stocks:
             stock = stock.strip()
             if stock:
-                cleaned_stocks.add(stock)
+                cleaned_stocks.add(stock.upper())
         
         # If stocks, start and end date are the same as loaded, just use the loaded data
         if (state.universe and state.universe.stocks and set(state.universe.stocks) == cleaned_stocks and 
