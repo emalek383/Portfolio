@@ -212,12 +212,12 @@ class StockUniverse():
         
         if optimiser == 'min_vol':
             try:
-                optimised_portfolio = efficient_portfolio(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
+                optimised_portfolio = efficient_portfolio(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds)
             except Exception as e:
                 raise ValueError(str(e))
         else:
             try:
-                optimised_portfolio = maximise_returns(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds, verbose = True)
+                optimised_portfolio = maximise_returns(optimised_portfolio, target, cov_type = cov_type, factor_bounds = factor_bounds)
             except Exception as e:
                 raise ValueError(str(e))
             
