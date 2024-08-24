@@ -318,7 +318,7 @@ def optimise_custom_portfolio(form, optimiser, target, factor_bounds = None):
     None.
 
     """
-    
+        
     universe = state.universe
     cov_type = state.cov_type
     

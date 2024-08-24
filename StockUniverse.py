@@ -35,6 +35,8 @@ class StockUniverse():
         Stock data.
     bonds_data: pd.DataFrame
         3-months T-Bill data.
+    historical_returns : pd.DataFrame
+        Historical returns for each stock.
     mean_returns : np.array
         Mean returns of stocks.
     cov_matrix : np.array
@@ -153,6 +155,7 @@ class StockUniverse():
         self.end_date = end_date
         self.stock_data = None
         self.bonds_data = None
+        self.historical_returns = None
         self.mean_returns = mean_returns
         self.cov_matrix = cov_matrix
         self.risk_free_rate = risk_free_rate
@@ -164,6 +167,8 @@ class StockUniverse():
         else:
             self.min_returns = self.max_returns = self.min_vol = self.max_vol = None
             self.max_sharpe = self.min_vol = 0
+        self.time_horizon = None
+
         
     def update_min_max(self):
         """
@@ -207,7 +212,7 @@ class StockUniverse():
             Portfolio with optimal weights, so as to achieve the target excess returns/vol.
 
         """
-        
+
         optimised_portfolio = Portfolio(self)
         
         if optimiser == 'min_vol':
@@ -272,12 +277,10 @@ class StockUniverse():
 
         """
         
-        returns = self.stock_data.pct_change()
-        mean_returns = get_mean_returns(returns)
-        cov_matrix = returns.cov()
-        
-        self.mean_returns = mean_returns
-        self.cov_matrix = cov_matrix
+        self.historical_returns = self.stock_data.pct_change().dropna()
+        self.time_horizon = len(self.historical_returns)
+        self.mean_returns = get_mean_returns(self.historical_returns)
+        self.cov_matrix = self.historical_returns.cov()
         
         if not self.risk_free_rate:
             self.calc_risk_free_rate()
@@ -590,6 +593,7 @@ class Portfolio():
             
         self.normalise_weights()
         self.calc_performance()
+
         
     def normalise_weights(self):
         """
