@@ -12,6 +12,7 @@ import datetime as dt
 from dateutil.relativedelta import relativedelta
 
 from FactorAnalysis import FactorAnalysis
+from RiskMetrics import RiskMetrics
 from data_loader import download_data
 from helper_functions import get_mean_returns, convert_to_date
 from optimisers import maximise_sharpe, minimise_vol, efficient_portfolio, maximise_returns
@@ -116,6 +117,7 @@ class StockUniverse():
                  stocks, 
                  start_date = dt.datetime.today() + relativedelta(years = -1), 
                  end_date = dt.datetime.today(), 
+                 stock_data = None,
                  mean_returns = None, 
                  cov_matrix = None,
                  risk_free_rate = None):
@@ -153,7 +155,7 @@ class StockUniverse():
         self.stocks = stocks
         self.start_date = start_date
         self.end_date = end_date
-        self.stock_data = None
+        self.stock_data = stock_data
         self.bonds_data = None
         self.historical_returns = None
         self.mean_returns = mean_returns
@@ -167,8 +169,7 @@ class StockUniverse():
         else:
             self.min_returns = self.max_returns = self.min_vol = self.max_vol = None
             self.max_sharpe = self.min_vol = 0
-        self.time_horizon = None
-
+        self.risk_metrics = RiskMetrics(self)
         
     def update_min_max(self):
         """
@@ -260,7 +261,11 @@ class StockUniverse():
         self.end_date = convert_to_date(self.stock_data.index[-1])
         
         bonds_data = download_data(['^IRX'], self.start_date, self.end_date)
-        self.bonds_data = bonds_data.rename('^IRX')
+        #self.bonds_data = bonds_data.rename('^IRX')
+        if isinstance(bonds_data, pd.DataFrame):
+            self.bonds_data = bonds_data['^IRX']
+        else:  # If it's a Series
+            self.bonds_data = bonds_data
         
         return ignored
         
@@ -278,7 +283,6 @@ class StockUniverse():
         """
         
         self.historical_returns = self.stock_data.pct_change().dropna()
-        self.time_horizon = len(self.historical_returns)
         self.mean_returns = get_mean_returns(self.historical_returns)
         self.cov_matrix = self.historical_returns.cov()
         
@@ -299,9 +303,10 @@ class StockUniverse():
 
         """
         
-        if len(self.bonds_data) == 0:
+        if self.bonds_data is None or len(self.bonds_data) == 0:
             self.risk_free_rate = 0
-            
+            return
+        
         R_F_annual = self.bonds_data/100
         self.risk_free_rate = get_mean_returns(R_F_annual)
         
@@ -586,6 +591,11 @@ class Portfolio():
         self.vol = 0
         self.excess_returns = 0
         
+        self.hist_var_cvar = {}
+        self.hist_var_confidence_level = None
+        self.mc_var_cvar = {}
+        self.mc_var_confidence_level = None
+        
         if len(weights) == 0:
             self.weights = np.array([1] * len(self.universe.stocks))
         else:
@@ -593,7 +603,6 @@ class Portfolio():
             
         self.normalise_weights()
         self.calc_performance()
-
         
     def normalise_weights(self):
         """
@@ -635,6 +644,8 @@ class Portfolio():
             self.vol = np.sqrt( np.dot(np.dot(self.weights.T, cov_matrix), self.weights) * TRADING_DAYS )
             self.excess_returns = self.returns - self.universe.risk_free_rate
             self.sharpe_ratio = self.excess_returns / self.vol
+            self.calc_hist_var_cvar()
+            self.calc_mc_var_cvar()
         
         else:
             self.returns = self.vol = self.excess_returns = self.sharpe_ratio = 0
@@ -660,15 +671,31 @@ class Portfolio():
 
         """
         
-        if not self.returns and self.vol and self.excess_returns and self.sharpe_ratio:
+        if not self.returns or not self.vol or not self.excess_returns or not self.sharpe_ratio:
             self.performance()
         
         results = {'Excess Returns': self.excess_returns,
                    'Volatility': self.vol,
                    'Sharpe Ratio': self.sharpe_ratio,}
         
+        format_horizon = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly'}
+                
+        for horizon, (var, cvar) in self.hist_var_cvar.items():
+            results[f'Historical VaR ({format_horizon[horizon]})'] = var
+            results[f'Historical CVaR ({format_horizon[horizon]})'] = cvar
+        
+        for horizon, (var, cvar) in self.mc_var_cvar.items():
+            results[f'Monte Carlo VaR ({format_horizon[horizon]})'] = var
+            results[f'Monte Carlo CVaR ({format_horizon[horizon]})'] = cvar
+        
         results_df = pd.DataFrame(results, index=[self.name + ' Portfolio'])
         format_map = {'Excess Returns': '{:,.1%}'.format, 'Volatility': '{:,.1%}'.format, 'Sharpe Ratio': '{:,.2f}'}
+        
+        for horizon in format_horizon.values():
+            format_map[f'Historical VaR ({horizon})'] = '{:,.1%}'.format
+            format_map[f'Historical CVaR ({horizon})'] = '{:,.1%}'.format
+            format_map[f'Monte Carlo VaR ({horizon})'] = '{:,.1%}'.format
+            format_map[f'Monte Carlo CVaR ({horizon})'] = '{:,.1%}'.format
         
         return results_df, format_map
     
@@ -698,3 +725,46 @@ class Portfolio():
         format_map = {col: "{:,.0%}".format for col in weights_df.columns}
         
         return weights_df, format_map
+    
+    def calc_hist_var_cvar(self, time_horizon = None, confidence_level = 0.95):
+        if not self.universe.risk_metrics:
+            self.universe.risk_metrics = RiskMetrics(self.universe)
+            
+        if not time_horizon:
+            for time_horizon in ['D', 'W', 'M']:
+                self.calc_hist_var_cvar(time_horizon = time_horizon, confidence_level = confidence_level)
+                
+        else:
+            rm = self.universe.risk_metrics
+            try:
+                self.hist_var_cvar[time_horizon] = rm.calculate_historical_var_cvar(self, 
+                                                                                    time_horizon = time_horizon,
+                                                                                    confidence_level = confidence_level)
+                self.hist_var_confidence_level = confidence_level
+            except ValueError as e:
+                if 'Time period is not long enough' in str(e):
+                    pass
+                else:
+                    raise
+    
+    def calc_mc_var_cvar(self, time_horizon = None, confidence_level = 0.95):
+        if not self.universe.risk_metrics:
+            self.universe.risk_metrics = RiskMetrics(self.universe)
+            
+        if not time_horizon:
+            for time_horizon in ['D', 'W', 'M']:
+                self.calc_mc_var_cvar(time_horizon = time_horizon, confidence_level = confidence_level)
+                
+        else:
+            rm = self.universe.risk_metrics
+            try:
+                self.mc_var_cvar[time_horizon] = rm.calculate_monte_carlo_var_cvar(self, 
+                                                                                   time_horizon = time_horizon,
+                                                                                   confidence_level = confidence_level)
+                self.mc_var_confidence_level = confidence_level
+            except ValueError as e:
+                if 'Time period is not long enough' in str(e):
+                    pass
+                else:
+                    raise
+                
