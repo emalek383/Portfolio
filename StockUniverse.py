@@ -58,6 +58,8 @@ class StockUniverse():
         Maximum annualised volatility achievable by a portfolio in the universe.
     factor_analysis : Factor_Analysis.Factor_Analysis
         Factor analysis run on the stock universe.
+    risk_metrics : RiskMetrics
+        Risk metrics calculator for the stock universe.
         
     Methods
     -------
@@ -261,17 +263,16 @@ class StockUniverse():
         self.end_date = convert_to_date(self.stock_data.index[-1])
         
         bonds_data = download_data(['^IRX'], self.start_date, self.end_date)
-        #self.bonds_data = bonds_data.rename('^IRX')
         if isinstance(bonds_data, pd.DataFrame):
             self.bonds_data = bonds_data['^IRX']
-        else:  # If it's a Series
+        else:
             self.bonds_data = bonds_data
         
         return ignored
         
     def calc_mean_returns_cov(self):
         """
-        Compute mean returns and covariance matrix of stock universe from the (downloaded) stock data.
+        Compute historical returns, mean returns and covariance matrix of stock universe from the (downloaded) stock data.
         Set the risk-free-rate from downloaded bonds data if it has not yet been set.
         Calculate the max Sharpe Ratio and min vol portfolios and update the min/max excess returns/vol.
         Update all these attributes.
@@ -534,18 +535,26 @@ class Portfolio():
     ----------
     universe : StockUniverse.StockUniverse
         Stock universe containing the stocks of the portfolio.
-    name: str
+    name : str
         Name of portfolio.
-    returns: float
+    returns : float
         Annualised returns of the portfolio.
-    vol: float
+    vol : float
         Annualised volatility of the portfolio.
-    excess_returns: float
+    excess_returns : float
         Annualised excess returns of the portfolio.
-    weights: np.array
+    weights : np.array
         Weights of the portfolio's stocks.
-    sharpe_ratio: float
+    sharpe_ratio : float
         Annualised Sharpe Ratio of the portfolio.
+    hist_var_cvar : dict
+        Dictionary containing historical VaR and CVaR for different time horizons.
+    hist_var_confidence_level : float
+        Confidence level used for historical VaR and CVaR calculations.
+    mc_var_cvar : dict
+        Dictionary containing Monte Carlo VaR and CVaR for different time horizons.
+    mc_var_confidence_level : float
+        Confidence level used for Monte Carlo VaR and CVaR calculations.
         
     Methods
     -------
@@ -562,6 +571,12 @@ class Portfolio():
         
     get_weights_df():
         Create a pd.DataFrame of the weights of the portfolio.
+        
+    calc_hist_var_cvar(time_horizon, confidence_level):
+        Calculate historical VaR and CVaR for the portfolio.
+        
+    calc_mc_var_cvar(time_horizon, confidence_level):
+        Calculate Monte Carlo VaR and CVaR for the portfolio.
         
     """
     
@@ -618,7 +633,8 @@ class Portfolio():
     
     def calc_performance(self, cov_type = 'sample_cov'):
         """
-        Compute portfolio performance with respect to an estimated covariance matrix: annualised return, excess return, volatility and Sharpe Ratio.
+        Compute portfolio performance with respect to an estimated covariance matrix: annualised return, excess return, volatility, Sharpe Ratio,
+        historical and Monte Carlo VaR and CVaR.
         
         Parameters
         ----------
@@ -644,8 +660,15 @@ class Portfolio():
             self.vol = np.sqrt( np.dot(np.dot(self.weights.T, cov_matrix), self.weights) * TRADING_DAYS )
             self.excess_returns = self.returns - self.universe.risk_free_rate
             self.sharpe_ratio = self.excess_returns / self.vol
-            self.calc_hist_var_cvar()
-            self.calc_mc_var_cvar()
+            try:
+                self.calc_hist_var_cvar()
+                self.calc_mc_var_cvar()
+            except ValueError as e:
+                if "Not enough data to compute VaR" in str(e):
+                    self.hist_var_cvar = {}
+                    self.mc_var_cvar = {}
+                else:
+                    raise
         
         else:
             self.returns = self.vol = self.excess_returns = self.sharpe_ratio = 0
@@ -665,7 +688,11 @@ class Portfolio():
                     'Excess Returns': annualised excess returns (float)
                     'Volatility': annualised volatility (float)
                     'Sharpe Ratio': annualised Sharpe Ratio (float)
-            Dataframe containing the excess returns, volatility and sharpe ratio.
+                    'Historical VaR (time_horizon)': historical VaR for different time_horizons
+                    'Historical CVaR (time_horizon)': historical CVaR for different time_horizons
+                    'Monte Carlo VaR (time_horizon)': Monte Carlo VaR for different time_horizons
+                    'Monte Carlo CVaR (time_horizon)': Monte Carlo CVaR for different time_horizons
+            Dataframe containing the excess returns, volatility, sharpe ratio and VaR/CVaR.
         format_map : dict
             Dictionary that maps the outputs into a nice format for display.
 
@@ -727,6 +754,22 @@ class Portfolio():
         return weights_df, format_map
     
     def calc_hist_var_cvar(self, time_horizon = None, confidence_level = 0.95):
+        """
+        Calculate historical VaR and CVaR for the portfolio.
+
+        Parameters
+        ----------
+        time_horizon : str, optional
+            Time horizon for VaR and CVaR calculation. If None, calculates for all available horizons. The default is None.
+        confidence_level : float, optional
+            Confidence level for VaR and CVaR calculation. The default is 0.95.
+
+        Returns
+        -------
+        None.
+        
+        """
+        
         if not self.universe.risk_metrics:
             self.universe.risk_metrics = RiskMetrics(self.universe)
             
@@ -748,6 +791,22 @@ class Portfolio():
                     raise
     
     def calc_mc_var_cvar(self, time_horizon = None, confidence_level = 0.95):
+        """
+        Calculate Monte Carlo VaR and CVaR for the portfolio.
+
+        Parameters
+        ----------
+        time_horizon : str, optional
+            Time horizon for VaR and CVaR calculation. If None, calculates for all available horizons. The default is None.
+        confidence_level : float, optional
+            Confidence level for VaR and CVaR calculation. The default is 0.95.
+
+        Returns
+        -------
+        None.
+        
+        """
+        
         if not self.universe.risk_metrics:
             self.universe.risk_metrics = RiskMetrics(self.universe)
             

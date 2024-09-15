@@ -230,29 +230,37 @@ def setup_portfolio_performances_display(output, portfolios):
     if not portfolios:
         return
     
-    col1, col2, col3, col4 = output.columns([0.25, 0.25, 0.15, 0.3])
+    has_var_data = any(len(portfolio.hist_var_cvar) > 0 or len(portfolio.mc_var_cvar) > 0 for _, portfolio in portfolios)
     
-    var_option = col1.radio(
-        'Choose VaR Estimation Method:',
-        ('Historical', 'Monte Carlo'),
-        horizontal = True,
-        key = "var_option_radio"
-        )
+    if not has_var_data:
+        output.warning("Insufficient data to compute VaR/CVaR. At least 50 trading days are required.")
     
-    var_conf_level = col3.number_input(
-        'VaR/CVaR confidence level:',
-        min_value = 0, 
-        max_value = 100,
-        value = 95)
+    if has_var_data:
+        col1, col2, col3, col4 = output.columns([0.25, 0.25, 0.15, 0.3])
+        
+        var_option = col1.radio(
+            'Choose VaR Estimation Method:',
+            ('Historical', 'Monte Carlo'),
+            horizontal = True,
+            key = "var_option_radio"
+            )
+        
+        var_conf_level = col3.number_input(
+            'VaR/CVaR confidence level:',
+            min_value = 0, 
+            max_value = 100,
+            value = 95)
 
     for _, portfolio in portfolios:
-        if var_option == 'Historical':
-            freqs = portfolio.hist_var_cvar.keys()
-        else:
-            freqs = portfolio.mc_var_cvar.keys()
+        if has_var_data:
+            if var_option == 'Historical':
+                freqs = portfolio.hist_var_cvar.keys()
+            else:
+                freqs = portfolio.mc_var_cvar.keys()
+            
+            portfolio.calc_hist_var_cvar(confidence_level = var_conf_level / 100)
+            portfolio.calc_mc_var_cvar(confidence_level = var_conf_level / 100)
         
-        portfolio.calc_hist_var_cvar(confidence_level = var_conf_level / 100)
-        portfolio.calc_mc_var_cvar(confidence_level = var_conf_level / 100)
         perf_df, format_map = portfolio.get_performance_df()
         joined_perf.append(perf_df)
             
@@ -261,33 +269,35 @@ def setup_portfolio_performances_display(output, portfolios):
     def format_horizon(key):
         return horizon_map[key]
     
-    var_period = col2.radio(
-        'Choose VaR/CVaR period:',
-        freqs,
-        horizontal = True,
-        format_func = format_horizon)
+    if has_var_data:
+        var_period = col2.radio(
+            'Choose VaR/CVaR period:',
+            freqs,
+            horizontal = True,
+            format_func = format_horizon)
     
     joined_perf_df = pd.concat(joined_perf, axis = 0)
     
     cols = ['Excess Returns', 'Volatility', 'Sharpe Ratio']
+    
+    if has_var_data:    
+        old_var_col = f"{var_option} VaR ({horizon_map[var_period]})"
+        old_cvar_col = f"{var_option} CVaR ({horizon_map[var_period]})"
+        new_var_col = f"{var_conf_level}% {var_option} VaR ({horizon_map[var_period]})"
+        new_cvar_col = f"{var_conf_level}% {var_option} CVaR ({horizon_map[var_period]})"
         
-    old_var_col = f"{var_option} VaR ({horizon_map[var_period]})"
-    old_cvar_col = f"{var_option} CVaR ({horizon_map[var_period]})"
-    new_var_col = f"{var_conf_level}% {var_option} VaR ({horizon_map[var_period]})"
-    new_cvar_col = f"{var_conf_level}% {var_option} CVaR ({horizon_map[var_period]})"
-    
-    if old_var_col in joined_perf_df.columns:
-        joined_perf_df[new_var_col] = joined_perf_df[old_var_col]
-        joined_perf_df.drop(old_var_col, axis=1, inplace=True)
-        format_map[new_var_col] = format_map.pop(old_var_col)
-    
-    if old_cvar_col in joined_perf_df.columns:
-        joined_perf_df[new_cvar_col] = joined_perf_df[old_cvar_col]
-        joined_perf_df.drop(old_cvar_col, axis=1, inplace=True)
-        format_map[new_cvar_col] = format_map.pop(old_cvar_col)
-    
-    cols.append(new_var_col)
-    cols.append(new_cvar_col)
+        if old_var_col in joined_perf_df.columns:
+            joined_perf_df[new_var_col] = joined_perf_df[old_var_col]
+            joined_perf_df.drop(old_var_col, axis=1, inplace=True)
+            format_map[new_var_col] = format_map.pop(old_var_col)
+        
+        if old_cvar_col in joined_perf_df.columns:
+            joined_perf_df[new_cvar_col] = joined_perf_df[old_cvar_col]
+            joined_perf_df.drop(old_cvar_col, axis=1, inplace=True)
+            format_map[new_cvar_col] = format_map.pop(old_cvar_col)
+        
+        cols.append(new_var_col)
+        cols.append(new_cvar_col)
 
     joined_perf_df = joined_perf_df[cols]
     
@@ -297,6 +307,7 @@ def setup_portfolio_performances_display(output, portfolios):
     html_table = style_table(joined_perf_df, format_map, is_mobile())
     wrapped_table = f'<div class="table-wrapper-75">{html_table}</div>'
     output.markdown(wrapped_table, unsafe_allow_html = True)
+    
     
 def setup_portfolio_weights_display(output, portfolios, label_threshold = 0.05, group_threshold = 0.05):
     """

@@ -2,6 +2,7 @@
 
 import numpy as np
 import streamlit as st
+from datetime import timedelta
 
 from StockUniverse import StockUniverse, Portfolio
 from portfolio_state_manager import clear_factor_cov_data, clear_factor_constrained_data, update_efficient_frontier, update_portfolio, get_portfolio, clear_all_portfolio_data
@@ -116,6 +117,10 @@ def process_stock_form(stock_list = None, start_date = None, end_date = None, ri
         else: # process form
             if start_date >= end_date:
                 errors += "You must pick a start date before the end date."
+                return errors
+            
+            if end_date - start_date <= timedelta(days = 100):
+                errors += "You must pick at least 100 days of data."
                 return errors
     
             if len(cleaned_stocks) < 2:
